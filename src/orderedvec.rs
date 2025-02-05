@@ -68,11 +68,13 @@ impl<T: Send + Sync + Ord + Clone + 'static> OrderedVec<T> {
             let sorted = self.sorted.borrow();
             if !sorted.is_empty() {
                 // move the ones <= sorted to sorted
-                while items_smaller.len() < MAX_MOVEMENT
-                    && !items.is_empty()
-                    && self.compare_item(items.last().unwrap(), sorted.last().unwrap()) == Ordering::Less
-                {
-                    items_smaller.push(items.pop().unwrap());
+                while items_smaller.len() < MAX_MOVEMENT && !items.is_empty() {
+                    let Some(items_last) = items.last() else { break };
+                    let Some(sorted_last) = sorted.last() else { break };
+
+                    if self.compare_item(items_last, sorted_last) == Ordering::Less {
+                        items_smaller.push(items.pop().unwrap());
+                    }
                 }
             }
         }
@@ -131,43 +133,42 @@ impl<T: Send + Sync + Ord + Clone + 'static> OrderedVec<T> {
         }
 
         while index >= sorted.len() {
-            let o_min_index = vectors
+            let Some(min_index) = vectors
                 .iter()
-                .map(|v| v.last())
+                .filter_map(|v| v.last())
                 .enumerate()
-                .filter(|(_idx, item)| item.is_some())
-                .min_by(|(_, a), (_, b)| self.compare_item(a.unwrap(), b.unwrap()))
-                .map(|(idx, _)| idx);
-            if o_min_index.is_none() {
+                .min_by(|(_, a), (_, b)| self.compare_item(a, b))
+                .map(|(idx, _)| idx)
+            else {
                 break;
-            }
+            };
 
-            let min_index = o_min_index.unwrap();
-            let min_item = vectors[min_index].pop();
-            if min_item.is_none() {
+            let Some(min_item) = vectors[min_index].pop() else {
                 break;
-            }
+            };
 
             if vectors[min_index].is_empty() {
                 vectors.remove(min_index);
             }
 
-            sorted.push(min_item.unwrap());
+            sorted.push(min_item);
         }
     }
 
     pub fn get(&self, index: usize) -> Option<T> {
         self.merge_till(index);
+
         if self.len() <= index {
-            None
-        } else {
-            let index = if self.tac && self.nosort {
-                self.len() - index - 1
-            } else {
-                index
-            };
-            self.sorted.borrow().get(index).cloned()
+            return None;
         }
+
+        let index = if self.tac && self.nosort {
+            self.len() - index - 1
+        } else {
+            index
+        };
+
+        self.sorted.borrow().get(index).cloned()
     }
 
     pub fn len(&self) -> usize {
