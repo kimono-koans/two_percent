@@ -54,6 +54,7 @@ impl Drop for ReaderControl {
 }
 
 impl ReaderControl {
+    #[allow(dropping_copy_types)]
     pub fn kill(&mut self) {
         debug!(
             "kill reader, components before: {}",
@@ -68,9 +69,9 @@ impl ReaderControl {
         let opt_thread_reader = self.thread_reader.take();
         let opt_thread_ingest = self.thread_ingest.take();
 
-        rayon::spawn(|| {
-            opt_thread_reader.map(|reader_handle| reader_handle.join());
-            opt_thread_ingest.map(|ingest_handle| ingest_handle.join());
+        rayon::spawn(move || {
+            let _ = drop(opt_thread_reader.and_then(|reader_handle| reader_handle.join().ok()));
+            let _ = drop(opt_thread_ingest.and_then(|ingest_handle| ingest_handle.join().ok()));
             #[cfg(feature = "malloc_trim")]
             #[cfg(target_os = "linux")]
             #[cfg(target_env = "gnu")]

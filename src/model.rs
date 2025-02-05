@@ -109,7 +109,7 @@ impl Drop for Model {
         let header = std::mem::take(&mut self.header);
         let item_pool = std::mem::take(&mut self.item_pool);
 
-        rayon::spawn(|| {
+        rayon::spawn(move || {
             drop(header);
             drop(selection);
             drop(item_pool);

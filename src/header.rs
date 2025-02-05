@@ -27,7 +27,7 @@ impl Drop for Header {
         let item_pool = std::mem::take(&mut self.item_pool);
         let header = std::mem::take(&mut self.header);
 
-        rayon::spawn(|| {
+        rayon::spawn(move || {
             drop(header);
             drop(item_pool);
         })

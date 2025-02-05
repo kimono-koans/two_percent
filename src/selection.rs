@@ -432,7 +432,7 @@ impl Selection {
         let (screen_width, screen_height) = canvas.size()?;
 
         // update item heights
-        self.height.store(screen_height, Ordering::Relaxed);
+        self.height.store(screen_height, Ordering::SeqCst);
 
         if screen_width < 3 {
             return Err("screen width is too small".into());

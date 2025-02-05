@@ -49,7 +49,7 @@ impl MatcherControl {
     }
 
     pub fn kill(&mut self) {
-        self.stopped.store(true, Ordering::Relaxed);
+        self.stopped.store(true, Ordering::SeqCst);
     }
 
     pub fn take(&mut self) -> Vec<MatchedItem> {
@@ -172,7 +172,7 @@ impl Matcher {
                 }
 
                 let _ = tx_heartbeat.send((Key::Null, Event::EvHeartBeat));
-                stopped.store(true, Ordering::Relaxed);
+                stopped.store(true, Ordering::SeqCst);
 
                 #[cfg(feature = "malloc_trim")]
                 #[cfg(target_os = "linux")]
