@@ -28,15 +28,8 @@ impl<T: Send + Sync + Ord + Clone + 'static> Drop for OrderedVec<T> {
         let sub_vectors = std::mem::take(self.sub_vectors.get_mut());
         let sorted = std::mem::take(self.sorted.get_mut());
 
-        rayon::spawn(|| {
-            drop(sub_vectors);
-            drop(sorted);
-
-            #[cfg(feature = "malloc_trim")]
-            #[cfg(target_os = "linux")]
-            #[cfg(target_env = "gnu")]
-            malloc_trim();
-        })
+        drop(sub_vectors);
+        drop(sorted);
     }
 }
 
