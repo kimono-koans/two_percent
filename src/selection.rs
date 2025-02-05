@@ -69,16 +69,8 @@ impl Drop for Selection {
         let items = std::mem::take(&mut self.items);
         let selected = std::mem::take(&mut self.selected);
 
-        // wait until fully stopped to drop, unlike take()
-        rayon::spawn(|| {
-            drop(items);
-            drop(selected);
-
-            #[cfg(feature = "malloc_trim")]
-            #[cfg(target_os = "linux")]
-            #[cfg(target_env = "gnu")]
-            malloc_trim();
-        });
+        drop(items);
+        drop(selected);
     }
 }
 
