@@ -31,25 +31,25 @@ shlex = { version = "1.3.0", optional = true, default-features = false }
 unicode-width = { version = "0.2.0", default-features = false, features = [
     "cjk",
 ] }
-log = { version = "0.4.22", default-features = false }
-env_logger = { version = "0.11.5", optional = true }
+log = { version = "0.4.25", default-features = false }
+env_logger = { version = "0.11.6", optional = true }
 clap = { version = "3.2.25", optional = true, default-features = false, features = [
     "std",
     "cargo",
 ] }
 tuikit = { version = "0.5.0", default-features = false }
-vte = { version = "0.13.0", default-features = false }
+vte = { version = "0.15.0", default-features = false }
 fuzzy-matcher = { version = "0.4.2", default-features = false, package = "fuzzy-muff" }
 rayon = { version = "1.10.0", default-features = false }
 derive_builder = { version = "0.20.2", default-features = false, features = [
     "alloc",
 ] }
-bitflags = { version = "2.6.0", default-features = false }
-crossbeam-channel = { version = "0.5.13", default-features = false, features = [
+bitflags = { version = "2.8.0", default-features = false }
+crossbeam-channel = { version = "0.5.14", default-features = false, features = [
     "std",
 ] }
-which = { version = "7.0.0", default-features = false }
-libc = { version = "0.2.168", default-features = false }
+which = { version = "7.0.1", default-features = false }
+libc = { version = "0.2.169", default-features = false }
 
 [features]
 default = ["cli"]

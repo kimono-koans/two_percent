@@ -192,7 +192,7 @@ impl ANSIParser {
         let mut state_machine = vte::Parser::new();
 
         for byte in text.as_bytes() {
-            state_machine.advance(self, *byte);
+            state_machine.advance(self, &[*byte]);
         }
         self.save_str();
 

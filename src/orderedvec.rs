@@ -5,11 +5,6 @@
 use std::cell::RefCell;
 use std::cmp::Ordering;
 
-#[cfg(feature = "malloc_trim")]
-#[cfg(target_os = "linux")]
-#[cfg(target_env = "gnu")]
-use crate::malloc_trim;
-
 const ORDERED_SIZE: usize = 300;
 const MAX_MOVEMENT: usize = 100;
 
