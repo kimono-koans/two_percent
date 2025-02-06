@@ -24,13 +24,8 @@ pub struct Header {
 
 impl Drop for Header {
     fn drop(&mut self) {
-        let item_pool = std::mem::take(&mut self.item_pool);
-        let header = std::mem::take(&mut self.header);
-
-        rayon::spawn(move || {
-            drop(header);
-            drop(item_pool);
-        })
+        let _item_pool = std::mem::take(&mut self.item_pool);
+        let _header = std::mem::take(&mut self.header);
     }
 }
 
