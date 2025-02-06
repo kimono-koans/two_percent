@@ -9,11 +9,6 @@ use std::sync::{Arc, Weak};
 use crate::spinlock::{SpinLock, SpinLockGuard};
 use crate::{MatchRange, Rank, SkimItem};
 
-#[cfg(feature = "malloc_trim")]
-#[cfg(target_os = "linux")]
-#[cfg(target_env = "gnu")]
-use crate::malloc_trim;
-
 //------------------------------------------------------------------------------
 
 #[derive(Debug)]
