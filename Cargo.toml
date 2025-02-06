@@ -1,6 +1,6 @@
 [package]
 name = "two_percent"
-version = "0.12.5"
+version = "0.12.6"
 authors = [
     "Zhang Jinzhou <lotabout@gmail.com>",
     "Robert Swinford <robert.swinford <...at...> gmail.com>",
@@ -39,7 +39,7 @@ clap = { version = "3.2.25", optional = true, default-features = false, features
 ] }
 tuikit = { version = "0.5.0", default-features = false }
 vte = { version = "0.15.0", default-features = false }
-fuzzy-matcher = { version = "0.4.3", default-features = false, package = "fuzzy-muff" }
+fuzzy-matcher = { version = "0.4.4", default-features = false, package = "fuzzy-muff" }
 rayon = { version = "1.10.0", default-features = false }
 derive_builder = { version = "0.20.2", default-features = false, features = [
     "alloc",
