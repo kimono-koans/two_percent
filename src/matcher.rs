@@ -13,11 +13,6 @@ use crate::{CaseMatching, MatchEngine, MatchEngineFactory, SkimItem};
 use crate::{MatchRange, Rank};
 use std::rc::Rc;
 
-#[cfg(feature = "malloc_trim")]
-#[cfg(target_os = "linux")]
-#[cfg(target_env = "gnu")]
-use crate::malloc_trim;
-
 const UNMATCHED_RANK: Rank = [0i32, 0i32, 0i32, 0i32];
 const UNMATCHED_RANGE: Option<MatchRange> = None;
 
@@ -171,11 +166,6 @@ impl Matcher {
 
                 let _ = tx_heartbeat.send((Key::Null, Event::EvHeartBeat));
                 stopped.store(true, Ordering::SeqCst);
-
-                #[cfg(feature = "malloc_trim")]
-                #[cfg(target_os = "linux")]
-                #[cfg(target_env = "gnu")]
-                malloc_trim();
             });
         });
 

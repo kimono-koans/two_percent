@@ -48,7 +48,7 @@ bitflags = { version = "2.8.0", default-features = false }
 crossbeam-channel = { version = "0.5.14", default-features = false, features = [
     "std",
 ] }
-which = { version = "7.0.1", default-features = false }
+which = { version = "7.0.2", default-features = false }
 libc = { version = "0.2.169", default-features = false }
 
 [features]
