@@ -103,25 +103,30 @@ impl Drop for Model {
     fn drop(&mut self) {
         let m_ctrl = self.matcher_control.take();
         let r_ctrl = self.reader_control.take();
-        let thread_pool = self.thread_pool.take();
 
         let selection = std::mem::take(&mut self.selection);
         let header = std::mem::take(&mut self.header);
         let item_pool = std::mem::take(&mut self.item_pool);
 
-        rayon::spawn(move || {
-            drop(header);
-            drop(selection);
-            drop(item_pool);
-            drop(m_ctrl);
-            drop(r_ctrl);
-            drop(thread_pool);
+        if let Some(thread_pool) = self.thread_pool.take() {
+            thread_pool.install(|| {
+                rayon::spawn(move || {
+                    drop(m_ctrl);
+                    drop(r_ctrl);
 
-            #[cfg(feature = "malloc_trim")]
-            #[cfg(target_os = "linux")]
-            #[cfg(target_env = "gnu")]
-            malloc_trim();
-        });
+                    drop(header);
+                    drop(selection);
+                    drop(item_pool);
+
+                    #[cfg(feature = "malloc_trim")]
+                    #[cfg(target_os = "linux")]
+                    #[cfg(target_env = "gnu")]
+                    malloc_trim();
+                });
+            });
+
+            drop(thread_pool);
+        }
 
         #[cfg(feature = "malloc_trim")]
         #[cfg(target_os = "linux")]
