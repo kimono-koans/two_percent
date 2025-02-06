@@ -1,6 +1,6 @@
 /// helper for turn a BufRead into a skim stream
 use std::io::BufRead;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
 use crossbeam_channel::{SendError, Sender};
 use regex::Regex;
@@ -81,6 +81,11 @@ pub fn ingest_loop(
     }
 }
 
+static EMPTY_STRING: LazyLock<Arc<Box<str>>> = LazyLock::new(|| {
+    let item: Box<str> = "".into();
+    Arc::new(item)
+});
+
 fn send(
     line: &str,
     opts: &SendRawOrBuild,
@@ -97,6 +102,7 @@ fn send(
             );
             Arc::new(item)
         }
+        SendRawOrBuild::Raw if line.is_empty() => EMPTY_STRING.clone(),
         SendRawOrBuild::Raw => {
             let item: Box<str> = line.into();
             Arc::new(item)
