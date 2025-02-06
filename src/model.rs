@@ -805,12 +805,16 @@ impl Model {
         let _ = self.tx.send((Key::Null, Event::EvHeartBeat));
 
         // kill existing matcher if exists, but reuse old matched items vec
-        let opt_matcher_items = self.matcher_control.take().map(|mut old_matcher| {
-            old_matcher.kill();
-            let mut old_items = old_matcher.take();
-            old_items.clear();
-            old_items
-        });
+        let old_matcher_items = self
+            .matcher_control
+            .take()
+            .map(|mut old_matcher| {
+                old_matcher.kill();
+                let mut old_items = old_matcher.take();
+                old_items.clear();
+                old_items
+            })
+            .unwrap_or_else(|| Vec::with_capacity(self.item_pool.len()));
 
         let matcher = if self.use_regex {
             &self.regex_matcher
@@ -823,7 +827,7 @@ impl Model {
             self.disabled,
             Arc::downgrade(&self.item_pool),
             self.tx.clone(),
-            opt_matcher_items.unwrap_or_else(|| Vec::with_capacity(self.item_pool.len())),
+            old_matcher_items,
             self.thread_pool
                 .as_ref()
                 .expect("Could not obtain a reference to a thread pool."),

@@ -33,9 +33,7 @@ impl Drop for MatcherControl {
     fn drop(&mut self) {
         self.kill();
 
-        let items = self.into_items();
-
-        drop(items);
+        let _items = self.into_items();
     }
 }
 
