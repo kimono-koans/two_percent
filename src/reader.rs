@@ -173,10 +173,8 @@ fn collect_item(
 
         if let Some(items_strong) = Weak::upgrade(&items_weak) {
             loop {
-                let rx_item_is_not_empty = !rx_item.is_empty();
-
                 match sel.ready() {
-                    i if i == item_channel && rx_item_is_not_empty => {
+                    i if i == item_channel && !rx_item.is_empty() => {
                         let Ok(mut locked) = items_strong.try_write() else {
                             continue;
                         };
@@ -201,7 +199,7 @@ fn collect_item(
                             continue;
                         }
                     },
-                    i if i == interrupt_channel && rx_item_is_not_empty => continue,
+                    i if i == interrupt_channel && !rx_item.is_empty() => continue,
                     i if i == interrupt_channel => break,
                     _ => unreachable!(),
                 }
