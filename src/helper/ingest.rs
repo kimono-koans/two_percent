@@ -102,7 +102,7 @@ fn send(
             );
             Arc::new(item)
         }
-        SendRawOrBuild::Raw if line.is_empty() || line.bytes().all(|b| b.is_ascii_whitespace()) => EMPTY_STRING.clone(),
+        SendRawOrBuild::Raw if line.is_empty() => EMPTY_STRING.clone(),
         SendRawOrBuild::Raw => {
             let item: Box<str> = line.into();
             Arc::new(item)
