@@ -135,24 +135,21 @@ impl<T: Send + Sync + Ord + Clone + 'static> OrderedVec<T> {
                 .iter()
                 .map(|v| v.last())
                 .enumerate()
-                .filter(|(_idx, item)| item.is_some())
-                .min_by(|(_, a), (_, b)| self.compare_item(a.unwrap(), b.unwrap()))
+                .filter_map(|(idx, item)| item.map(|i| (idx, i)))
+                .min_by(|(_, a), (_, b)| self.compare_item(a, b))
                 .map(|(idx, _)| idx);
-            if o_min_index.is_none() {
-                break;
-            }
 
-            let min_index = o_min_index.unwrap();
-            let min_item = vectors[min_index].pop();
-            if min_item.is_none() {
+            let Some(min_index) = o_min_index else { break };
+
+            let Some(min_item) = vectors[min_index].pop() else {
                 break;
-            }
+            };
 
             if vectors[min_index].is_empty() {
                 vectors.remove(min_index);
             }
 
-            sorted.push(min_item.unwrap());
+            sorted.push(min_item);
         }
     }
 
