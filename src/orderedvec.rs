@@ -131,15 +131,16 @@ impl<T: Send + Sync + Ord + Clone + 'static> OrderedVec<T> {
         }
 
         while index >= sorted.len() {
-            let o_min_index = vectors
+            let Some(min_index) = vectors
                 .iter()
                 .map(|v| v.last())
                 .enumerate()
                 .filter_map(|(idx, item)| item.map(|i| (idx, i)))
                 .min_by(|(_, a), (_, b)| self.compare_item(a, b))
-                .map(|(idx, _)| idx);
-
-            let Some(min_index) = o_min_index else { break };
+                .map(|(idx, _)| idx)
+            else {
+                break;
+            };
 
             let Some(min_item) = vectors[min_index].pop() else {
                 break;
