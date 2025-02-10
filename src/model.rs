@@ -810,7 +810,7 @@ impl Model {
             .take()
             .map(|mut old_matcher| {
                 old_matcher.kill();
-                let mut old_items = old_matcher.take();
+                let mut old_items = old_matcher.into_items();
                 old_items.clear();
                 old_items
             })
