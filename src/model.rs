@@ -530,7 +530,7 @@ impl Model {
         let item_len = query.len();
         let item: Arc<dyn SkimItem> = Arc::new(query);
         let downgraded = Arc::downgrade(&item);
-        let new_len = self.item_pool.append(vec![item]);
+        let new_len = self.item_pool.append(&[item]);
         let item_idx = (max(new_len, 1) - 1) as usize;
 
         let matched_item = MatchedItem {
@@ -785,7 +785,9 @@ impl Model {
             let processed = all_stopped && is_empty;
             if !processed {
                 // take out new items and put them into items
-                self.item_pool.append(ctrl.take());
+                if let Ok(mut locked) = ctrl.expose_items().try_write() {
+                    self.item_pool.append(&mut locked);
+                }
             }
 
             if !all_stopped {

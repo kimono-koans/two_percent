@@ -88,6 +88,11 @@ impl ReaderControl {
         Vec::new()
     }
 
+    #[allow(dead_code)]
+    pub fn expose_items(&mut self) -> &mut Arc<RwLock<Vec<Arc<dyn SkimItem>>>> {
+        &mut self.items
+    }
+
     pub fn all_stopped(&self) -> bool {
         self.components_to_stop.load(Ordering::SeqCst) == 0
     }
