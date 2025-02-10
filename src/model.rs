@@ -805,7 +805,7 @@ impl Model {
         let _ = self.tx.send((Key::Null, Event::EvHeartBeat));
 
         // kill existing matcher if exists, but reuse old matched items vec
-        let old_matcher_items = self
+        let cleared_vec = self
             .matcher_control
             .take()
             .map(|mut old_matcher| {
@@ -827,7 +827,7 @@ impl Model {
             self.disabled,
             Arc::downgrade(&self.item_pool),
             self.tx.clone(),
-            old_matcher_items,
+            cleared_vec,
             self.thread_pool
                 .as_ref()
                 .expect("Could not obtain a reference to a thread pool."),
