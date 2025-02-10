@@ -1,4 +1,5 @@
 use crate::global::mark_new_run;
+use crate::item::ItemPool;
 ///! Reader is used for reading items from datasource (e.g. stdin or command output)
 ///!
 ///! After reading in a line, reader will save an item into the pool(items)
@@ -88,9 +89,11 @@ impl ReaderControl {
         Vec::new()
     }
 
-    #[allow(dead_code)]
-    pub fn expose_items(&mut self) -> &mut Arc<RwLock<Vec<Arc<dyn SkimItem>>>> {
-        &mut self.items
+    pub fn transfer_items(&mut self, item_pool: &Arc<ItemPool>) {
+        if let Ok(mut locked) = self.items.try_write() {
+            item_pool.append(&locked);
+            locked.clear();
+        }
     }
 
     pub fn all_stopped(&self) -> bool {

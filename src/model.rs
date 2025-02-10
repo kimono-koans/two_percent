@@ -785,9 +785,7 @@ impl Model {
             let processed = all_stopped && is_empty;
             if !processed {
                 // take out new items and put them into items
-                if let Ok(mut locked) = ctrl.expose_items().try_write() {
-                    self.item_pool.append(&mut locked);
-                }
+                ctrl.transfer_items(&self.item_pool);
             }
 
             if !all_stopped {
