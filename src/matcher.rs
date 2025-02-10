@@ -28,7 +28,7 @@ impl Drop for MatcherControl {
     fn drop(&mut self) {
         self.kill();
 
-        let _items = self.into_items();
+        let _items = self.take();
     }
 }
 
@@ -55,7 +55,7 @@ impl MatcherControl {
     }
 
     #[allow(clippy::wrong_self_convention)]
-    pub fn into_items(&mut self) -> Vec<MatchedItem> {
+    pub fn into_items(mut self) -> Vec<MatchedItem> {
         while !self.stopped.load(Ordering::Relaxed) {}
         self.take()
     }
