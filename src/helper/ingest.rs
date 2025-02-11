@@ -73,7 +73,7 @@ pub fn ingest_loop(
 
                 send(line, &opts, &tx_item)
             })
-            .unwrap();
+            .expect("There was an error sending text from the ingest thread to the receiver.");
 
         bytes_buffer.clear();
     }
