@@ -19,9 +19,9 @@ use std::time::Duration;
 #[cfg(target_env = "gnu")]
 use crate::malloc_trim;
 
-const ITEMS_INITIAL_CAPACITY: usize = 65536;
+pub const ITEMS_INITIAL_CAPACITY: usize = 65_536;
 const SLEEP_FAST: Duration = Duration::from_millis(1);
-const SLEEP_SLOW: Duration = Duration::from_millis(20);
+const SLEEP_SLOW: Duration = Duration::from_millis(10);
 
 pub trait CommandCollector {
     /// execute the `cmd` and produce a
@@ -183,22 +183,28 @@ fn collect_item(
             loop {
                 match sel.ready() {
                     i if i == item_channel && !rx_item.is_empty() => {
-                        let Ok(mut locked) = items_strong.try_write() else {
-                            continue;
-                        };
+                        match items_strong.try_write() {
+                            Ok(mut locked) => {
+                                locked.extend(rx_item.try_iter());
+                                drop(locked);
 
-                        locked.extend(rx_item.try_iter());
-                        drop(locked);
+                                // slow path
+                                if empty_count >= 1 {
+                                    // faster for slow path but not for fast path
+                                    sleep(SLEEP_SLOW);
+                                    continue;
+                                }
 
-                        // slow path
-                        if empty_count > 1 {
-                            // faster for slow path but not for fast path
-                            sleep(SLEEP_SLOW);
-                            continue;
+                                // fast path
+                                sleep(SLEEP_FAST);
+                                continue;
+                            }
+                            Err(_) => {
+                                empty_count += 1;
+                                sleep(SLEEP_SLOW);
+                                continue;
+                            }
                         }
-
-                        // fast path
-                        sleep(SLEEP_FAST);
                     }
                     i if i == item_channel => match rx_item.try_recv() {
                         Err(TryRecvError::Disconnected) => break,

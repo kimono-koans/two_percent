@@ -101,7 +101,8 @@ impl Ord for MatchedItem {
 }
 
 //------------------------------------------------------------------------------
-const ITEM_POOL_CAPACITY: usize = 1024;
+
+use crate::reader::ITEMS_INITIAL_CAPACITY;
 
 pub struct ItemPool {
     length: AtomicUsize,
@@ -131,7 +132,7 @@ impl ItemPool {
     pub fn new() -> Self {
         Self {
             length: AtomicUsize::new(0),
-            pool: SpinLock::new(Vec::with_capacity(ITEM_POOL_CAPACITY)),
+            pool: SpinLock::new(Vec::with_capacity(ITEMS_INITIAL_CAPACITY)),
             taken: AtomicUsize::new(0),
             reserved_items: SpinLock::new(Vec::new()),
             lines_to_reserve: 0,
