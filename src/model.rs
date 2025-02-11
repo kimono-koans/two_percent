@@ -783,6 +783,7 @@ impl Model {
             let all_stopped = ctrl.all_stopped();
             let is_empty = ctrl.is_empty();
             let processed = all_stopped && is_empty;
+
             if !processed {
                 // take out new items and put them into items
                 ctrl.transfer_items(&self.item_pool);

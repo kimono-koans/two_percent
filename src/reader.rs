@@ -10,7 +10,7 @@ use crossbeam_channel::{unbounded, Select, Sender};
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::{Arc, RwLock, Weak};
+use std::sync::{Arc, RwLock, TryLockError, Weak};
 use std::thread::{self, sleep, JoinHandle};
 use std::time::Duration;
 
@@ -199,11 +199,16 @@ fn collect_item(
                                 sleep(SLEEP_FAST);
                                 continue;
                             }
-                            Err(_) => {
-                                empty_count += 1;
-                                sleep(SLEEP_SLOW);
-                                continue;
-                            }
+                            Err(err) => match err {
+                                TryLockError::Poisoned(_) => {
+                                    eprintln!("ERROR: The lock could not be acquired because another thread failed while holding the lock.");
+                                    std::process::exit(1)
+                                }
+                                TryLockError::WouldBlock => {
+                                    sleep(SLEEP_SLOW);
+                                    continue;
+                                }
+                            },
                         }
                     }
                     i if i == item_channel => match rx_item.try_recv() {
