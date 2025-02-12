@@ -172,7 +172,7 @@ impl ItemPool {
     }
 
     /// append the items and return the new_size of the pool
-    pub fn append(&self, items: &mut Vec<Arc<dyn SkimItem>>) -> usize {
+    pub fn append(&self, items: &[Arc<dyn SkimItem>]) -> usize {
         let len = items.len();
         trace!("item pool, append {} items", len);
         let mut pool = self.pool.lock();
@@ -181,12 +181,12 @@ impl ItemPool {
         let to_reserve = self.lines_to_reserve - header_items.len();
         if to_reserve > 0 {
             let to_reserve = min(to_reserve, items.len());
-            let reserved_pool: &mut Vec<Arc<dyn SkimItem>> = &mut items[..to_reserve].to_vec();
-            pool.append(reserved_pool);
+            let reserved_pool: &[Arc<dyn SkimItem>] = &items[..to_reserve];
+            pool.extend_from_slice(reserved_pool);
             let mut reserved_header: Vec<Weak<dyn SkimItem>> = reserved_pool.iter().map(Arc::downgrade).collect();
-            header_items.append(&mut reserved_header);
+            header_items.extend_from_slice(&mut reserved_header);
         } else {
-            pool.append(items);
+            pool.extend_from_slice(items);
         }
 
         self.length.store(pool.len(), Ordering::SeqCst);
