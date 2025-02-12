@@ -2,10 +2,11 @@
 ///! the internal states, such as selected or not
 use std::cmp::min;
 use std::default::Default;
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Weak};
 
+use crate::helper::vec::concat;
 use crate::spinlock::{SpinLock, SpinLockGuard};
 use crate::{MatchRange, Rank, SkimItem};
 
@@ -172,21 +173,22 @@ impl ItemPool {
     }
 
     /// append the items and return the new_size of the pool
-    pub fn append(&self, items: &[Arc<dyn SkimItem>]) -> usize {
+    pub fn append(&self, items: &mut [Arc<dyn SkimItem>]) -> usize {
         let len = items.len();
         trace!("item pool, append {} items", len);
-        let mut pool = self.pool.lock();
+        let mut lock = self.pool.lock();
+        let pool = lock.deref_mut();
         let mut header_items = self.reserved_items.lock();
 
         let to_reserve = self.lines_to_reserve - header_items.len();
         if to_reserve > 0 {
             let to_reserve = min(to_reserve, items.len());
-            let reserved_pool: &[Arc<dyn SkimItem>] = &items[..to_reserve];
-            pool.extend_from_slice(reserved_pool);
+            let reserved_pool: &mut [Arc<dyn SkimItem>] = &mut items[..to_reserve];
+            concat(pool, reserved_pool);
             let mut reserved_header: Vec<Weak<dyn SkimItem>> = reserved_pool.iter().map(Arc::downgrade).collect();
-            header_items.extend_from_slice(&mut reserved_header);
+            concat(&mut header_items, &mut reserved_header);
         } else {
-            pool.extend_from_slice(items);
+            concat(pool, items)
         }
 
         self.length.store(pool.len(), Ordering::SeqCst);

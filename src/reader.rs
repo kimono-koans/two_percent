@@ -90,7 +90,7 @@ impl ReaderControl {
 
     pub fn transfer_items(&mut self, item_pool: &Arc<ItemPool>) {
         if let Ok(mut locked) = self.items.try_write() {
-            item_pool.append(&locked);
+            item_pool.append(&mut locked);
             locked.clear();
         }
     }

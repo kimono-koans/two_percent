@@ -530,7 +530,7 @@ impl Model {
         let item_len = query.len();
         let item: Arc<dyn SkimItem> = Arc::new(query);
         let downgraded = Arc::downgrade(&item);
-        let new_len = self.item_pool.append(&[item]);
+        let new_len = self.item_pool.append(&mut [item]);
         let item_idx = (max(new_len, 1) - 1) as usize;
 
         let matched_item = MatchedItem {
