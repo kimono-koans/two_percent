@@ -3,10 +3,10 @@ use std::io::BufRead;
 use std::sync::{Arc, LazyLock};
 
 use crossbeam_channel::{SendError, Sender};
-use regex::Regex;
 
 use crate::field::FieldRange;
 use crate::SkimItem;
+use regex::Regex;
 use std::io::ErrorKind;
 
 use super::item::DefaultSkimItem;
@@ -32,16 +32,35 @@ pub fn ingest_loop(
     tx_item: Sender<Arc<dyn SkimItem>>,
     opts: SendRawOrBuild,
 ) {
-    let line_ending_is_not_newline = line_ending != b'\n';
-
-    let mut bytes_buffer = Vec::with_capacity(65_536);
-
     loop {
         // first, read lots of bytes into the buffer
         match source.fill_buf() {
-            Ok(res) => {
-                bytes_buffer.extend_from_slice(res);
-                source.consume(bytes_buffer.len());
+            Ok(bytes_buffer) => {
+                // break when there is nothing left to read
+                if bytes_buffer.is_empty() {
+                    break;
+                }
+
+                let mut buffer_len = bytes_buffer.len();
+
+                let string = std::str::from_utf8(bytes_buffer).expect("Could not convert bytes to valid UTF8.");
+
+                match string.rsplit_once(line_ending as char) {
+                    Some((main, frag)) => {
+                        buffer_len -= frag.len();
+
+                        main.trim()
+                            .split(line_ending as char)
+                            .try_for_each(|line| send(line, &opts, &tx_item))
+                            .expect("There was an error sending text from the ingest thread to the receiver.");
+                    }
+                    _ => {
+                        send(string.trim(), &opts, &tx_item)
+                            .expect("There was an error sending text from the ingest thread to the receiver.");
+                    }
+                }
+
+                source.consume(buffer_len);
             }
             Err(err) => match err.kind() {
                 ErrorKind::Interrupted => continue,
@@ -50,32 +69,6 @@ pub fn ingest_loop(
                 }
             },
         }
-
-        // now, keep reading to make sure we haven't stopped in the middle of a word.
-        // no need to add the bytes to the total buf_len, as these bytes are auto-"consumed()",
-        // and bytes_buffer will be extended from slice to accommodate the new bytes
-        let _ = source.read_until(b'\n', &mut bytes_buffer);
-
-        // break when there is nothing left to read
-        if bytes_buffer.is_empty() {
-            break;
-        }
-
-        std::str::from_utf8_mut(&mut bytes_buffer)
-            .expect("Could not convert bytes to valid UTF8.")
-            .lines()
-            .try_for_each(|line| {
-                if line_ending_is_not_newline {
-                    return line
-                        .split(line_ending as char)
-                        .try_for_each(|line| send(line, &opts, &tx_item));
-                }
-
-                send(line, &opts, &tx_item)
-            })
-            .expect("There was an error sending text from the ingest thread to the receiver.");
-
-        bytes_buffer.clear();
     }
 }
 
