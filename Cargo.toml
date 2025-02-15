@@ -12,7 +12,7 @@ repository = "https://github.com/kimono-koans/two_percent"
 readme = "README.md"
 keywords = ["fuzzy", "menu", "util"]
 license = "MIT"
-edition = "2018"
+edition = "2021"
 
 [lib]
 name = "skim"
@@ -50,6 +50,7 @@ crossbeam-channel = { version = "0.5.14", default-features = false, features = [
 ] }
 which = { version = "7.0.2", default-features = false }
 libc = { version = "0.2.169", default-features = false }
+itertools = "0.14.0"
 
 [features]
 default = ["cli"]

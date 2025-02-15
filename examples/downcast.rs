@@ -29,9 +29,9 @@ pub fn main() {
 
     let (tx, rx): (SkimItemSender, SkimItemReceiver) = unbounded();
 
-    tx.send(Arc::new(Item { text: "a".to_string() })).unwrap();
-    tx.send(Arc::new(Item { text: "b".to_string() })).unwrap();
-    tx.send(Arc::new(Item { text: "c".to_string() })).unwrap();
+    tx.send(vec![Arc::new(Item { text: "a".to_string() })]).unwrap();
+    tx.send(vec![Arc::new(Item { text: "b".to_string() })]).unwrap();
+    tx.send(vec![Arc::new(Item { text: "c".to_string() })]).unwrap();
 
     drop(tx);
 
