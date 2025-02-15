@@ -37,12 +37,8 @@ pub fn ingest_loop(
     loop {
         // first, read lots of bytes into the buffer
         match source.fill_buf() {
+            Ok(bytes_buffer) if bytes_buffer.is_empty() => break,
             Ok(bytes_buffer) => {
-                // break when there is nothing left to read
-                if bytes_buffer.is_empty() {
-                    break;
-                }
-
                 let buffer_len = bytes_buffer.len();
 
                 let string = std::str::from_utf8(bytes_buffer).expect("Could not convert bytes to valid UTF8.");
