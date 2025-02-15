@@ -32,6 +32,8 @@ pub fn ingest_loop(
     tx_item: Sender<Arc<dyn SkimItem>>,
     opts: SendRawOrBuild,
 ) {
+    let mut frag_buffer = String::with_capacity(128);
+
     loop {
         // first, read lots of bytes into the buffer
         match source.fill_buf() {
@@ -41,20 +43,37 @@ pub fn ingest_loop(
                     break;
                 }
 
-                let mut buffer_len = bytes_buffer.len();
+                let buffer_len = bytes_buffer.len();
 
                 let string = std::str::from_utf8(bytes_buffer).expect("Could not convert bytes to valid UTF8.");
 
                 match string.rsplit_once(line_ending as char) {
                     Some((main, frag)) => {
-                        buffer_len -= frag.len();
+                        let mut iter = main.split(line_ending as char);
 
-                        main.trim()
-                            .split(line_ending as char)
-                            .try_for_each(|line| send(line, &opts, &tx_item))
+                        if !frag_buffer.is_empty() {
+                            if let Some(first) = iter.next() {
+                                frag_buffer.push_str(first);
+                                send(&frag_buffer, &opts, &tx_item)
+                                    .expect("There was an error sending text from the ingest thread to the receiver.");
+                                frag_buffer.clear();
+                            }
+                        }
+
+                        iter.try_for_each(|line| send(line, &opts, &tx_item))
                             .expect("There was an error sending text from the ingest thread to the receiver.");
+
+                        frag_buffer.push_str(frag);
                     }
                     _ => {
+                        if !frag_buffer.is_empty() {
+                            frag_buffer.push_str(string);
+                            send(&frag_buffer, &opts, &tx_item)
+                                .expect("There was an error sending text from the ingest thread to the receiver.");
+                            frag_buffer.clear();
+                            continue;
+                        }
+
                         send(string.trim(), &opts, &tx_item)
                             .expect("There was an error sending text from the ingest thread to the receiver.");
                     }
