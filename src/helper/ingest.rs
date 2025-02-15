@@ -90,12 +90,14 @@ fn stitch(old: &mut String, new: &str, line_ending: u8, opts: &SendRawOrBuild, t
     if !new.starts_with(line_ending as char) {
         old.push_str(new);
         send(&old, &opts, &tx_item).expect("There was an error sending text from the ingest thread to the receiver.");
-    } else {
-        [&old, new]
-            .iter()
-            .try_for_each(|line| send(line, &opts, &tx_item))
-            .expect("There was an error sending text from the ingest thread to the receiver.");
+        old.clear();
+        return;
     }
+
+    [&old, new]
+        .iter()
+        .try_for_each(|line| send(line, &opts, &tx_item))
+        .expect("There was an error sending text from the ingest thread to the receiver.");
 
     old.clear();
 }
