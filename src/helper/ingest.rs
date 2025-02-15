@@ -53,21 +53,7 @@ pub fn ingest_loop(
 
                         if !frag_buffer.is_empty() {
                             if let Some(first) = iter.next() {
-                                if !first.starts_with(line_ending as char) {
-                                    frag_buffer.push_str(first);
-                                    send(&frag_buffer, &opts, &tx_item).expect(
-                                        "There was an error sending text from the ingest thread to the receiver.",
-                                    );
-                                } else {
-                                    [&frag_buffer, first]
-                                        .iter()
-                                        .try_for_each(|line| send(line, &opts, &tx_item))
-                                        .expect(
-                                            "There was an error sending text from the ingest thread to the receiver.",
-                                        );
-                                }
-
-                                frag_buffer.clear();
+                                stitch(&mut frag_buffer, first, line_ending, &opts, &tx_item);
                             }
                         }
 
@@ -78,18 +64,7 @@ pub fn ingest_loop(
                     }
                     _ => {
                         if !frag_buffer.is_empty() {
-                            if !string.starts_with(line_ending as char) {
-                                frag_buffer.push_str(string);
-                                send(&frag_buffer, &opts, &tx_item)
-                                    .expect("There was an error sending text from the ingest thread to the receiver.");
-                            } else {
-                                [&frag_buffer, string]
-                                    .iter()
-                                    .try_for_each(|line| send(line, &opts, &tx_item))
-                                    .expect("There was an error sending text from the ingest thread to the receiver.");
-                            }
-
-                            frag_buffer.clear();
+                            stitch(&mut frag_buffer, string, line_ending, &opts, &tx_item);
                             continue;
                         }
 
@@ -114,6 +89,20 @@ static EMPTY_STRING: LazyLock<Arc<Box<str>>> = LazyLock::new(|| {
     let item: Box<str> = "".into();
     Arc::new(item)
 });
+
+fn stitch(old: &mut String, new: &str, line_ending: u8, opts: &SendRawOrBuild, tx_item: &Sender<Arc<dyn SkimItem>>) {
+    if !new.starts_with(line_ending as char) {
+        old.push_str(new);
+        send(&old, &opts, &tx_item).expect("There was an error sending text from the ingest thread to the receiver.");
+    } else {
+        [&old, new]
+            .iter()
+            .try_for_each(|line| send(line, &opts, &tx_item))
+            .expect("There was an error sending text from the ingest thread to the receiver.");
+    }
+
+    old.clear();
+}
 
 fn send(
     line: &str,
