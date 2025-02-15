@@ -53,9 +53,20 @@ pub fn ingest_loop(
 
                         if !frag_buffer.is_empty() {
                             if let Some(first) = iter.next() {
-                                frag_buffer.push_str(first);
-                                send(&frag_buffer, &opts, &tx_item)
-                                    .expect("There was an error sending text from the ingest thread to the receiver.");
+                                if !first.starts_with(line_ending as char) {
+                                    frag_buffer.push_str(first);
+                                    send(&frag_buffer, &opts, &tx_item).expect(
+                                        "There was an error sending text from the ingest thread to the receiver.",
+                                    );
+                                } else {
+                                    [&frag_buffer, first]
+                                        .iter()
+                                        .try_for_each(|line| send(line, &opts, &tx_item))
+                                        .expect(
+                                            "There was an error sending text from the ingest thread to the receiver.",
+                                        );
+                                }
+
                                 frag_buffer.clear();
                             }
                         }
@@ -67,14 +78,22 @@ pub fn ingest_loop(
                     }
                     _ => {
                         if !frag_buffer.is_empty() {
-                            frag_buffer.push_str(string);
-                            send(&frag_buffer, &opts, &tx_item)
-                                .expect("There was an error sending text from the ingest thread to the receiver.");
+                            if !string.starts_with(line_ending as char) {
+                                frag_buffer.push_str(string);
+                                send(&frag_buffer, &opts, &tx_item)
+                                    .expect("There was an error sending text from the ingest thread to the receiver.");
+                            } else {
+                                [&frag_buffer, string]
+                                    .iter()
+                                    .try_for_each(|line| send(line, &opts, &tx_item))
+                                    .expect("There was an error sending text from the ingest thread to the receiver.");
+                            }
+
                             frag_buffer.clear();
                             continue;
                         }
 
-                        send(string.trim(), &opts, &tx_item)
+                        send(string, &opts, &tx_item)
                             .expect("There was an error sending text from the ingest thread to the receiver.");
                     }
                 }
