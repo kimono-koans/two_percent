@@ -3,10 +3,10 @@ use std::io::BufRead;
 use std::sync::{Arc, LazyLock};
 
 use crossbeam_channel::{SendError, Sender};
-use regex::Regex;
 
 use crate::field::FieldRange;
 use crate::SkimItem;
+use regex::Regex;
 use std::io::ErrorKind;
 
 use super::item::DefaultSkimItem;
@@ -32,16 +32,44 @@ pub fn ingest_loop(
     tx_item: Sender<Arc<dyn SkimItem>>,
     opts: SendRawOrBuild,
 ) {
-    let line_ending_is_not_newline = line_ending != b'\n';
-
-    let mut bytes_buffer = Vec::with_capacity(65_536);
+    let mut frag_buffer = String::with_capacity(128);
 
     loop {
         // first, read lots of bytes into the buffer
         match source.fill_buf() {
-            Ok(res) => {
-                bytes_buffer.extend_from_slice(res);
-                source.consume(bytes_buffer.len());
+            Ok(bytes_buffer) if bytes_buffer.is_empty() => break,
+            Ok(bytes_buffer) => {
+                let buffer_len = bytes_buffer.len();
+
+                let string = std::str::from_utf8(bytes_buffer).expect("Could not convert bytes to valid UTF8.");
+
+                match string.rsplit_once(line_ending as char) {
+                    Some((main, frag)) => {
+                        let mut iter = main.split(line_ending as char);
+
+                        if !frag_buffer.is_empty() {
+                            if let Some(first) = iter.next() {
+                                stitch(&mut frag_buffer, first, line_ending, &opts, &tx_item);
+                            }
+                        }
+
+                        iter.try_for_each(|line| send(line, &opts, &tx_item))
+                            .expect("There was an error sending text from the ingest thread to the receiver.");
+
+                        frag_buffer.push_str(frag);
+                    }
+                    _ => {
+                        if !frag_buffer.is_empty() {
+                            stitch(&mut frag_buffer, string, line_ending, &opts, &tx_item);
+                            continue;
+                        }
+
+                        send(string, &opts, &tx_item)
+                            .expect("There was an error sending text from the ingest thread to the receiver.");
+                    }
+                }
+
+                source.consume(buffer_len);
             }
             Err(err) => match err.kind() {
                 ErrorKind::Interrupted => continue,
@@ -50,32 +78,6 @@ pub fn ingest_loop(
                 }
             },
         }
-
-        // now, keep reading to make sure we haven't stopped in the middle of a word.
-        // no need to add the bytes to the total buf_len, as these bytes are auto-"consumed()",
-        // and bytes_buffer will be extended from slice to accommodate the new bytes
-        let _ = source.read_until(b'\n', &mut bytes_buffer);
-
-        // break when there is nothing left to read
-        if bytes_buffer.is_empty() {
-            break;
-        }
-
-        std::str::from_utf8_mut(&mut bytes_buffer)
-            .expect("Could not convert bytes to valid UTF8.")
-            .lines()
-            .try_for_each(|line| {
-                if line_ending_is_not_newline {
-                    return line
-                        .split(line_ending as char)
-                        .try_for_each(|line| send(line, &opts, &tx_item));
-                }
-
-                send(line, &opts, &tx_item)
-            })
-            .expect("There was an error sending text from the ingest thread to the receiver.");
-
-        bytes_buffer.clear();
     }
 }
 
@@ -83,6 +85,22 @@ static EMPTY_STRING: LazyLock<Arc<Box<str>>> = LazyLock::new(|| {
     let item: Box<str> = "".into();
     Arc::new(item)
 });
+
+fn stitch(old: &mut String, new: &str, line_ending: u8, opts: &SendRawOrBuild, tx_item: &Sender<Arc<dyn SkimItem>>) {
+    if !new.starts_with(line_ending as char) {
+        old.push_str(new);
+        send(&old, &opts, &tx_item).expect("There was an error sending text from the ingest thread to the receiver.");
+        old.clear();
+        return;
+    }
+
+    [&old, new]
+        .iter()
+        .try_for_each(|line| send(line, &opts, &tx_item))
+        .expect("There was an error sending text from the ingest thread to the receiver.");
+
+    old.clear();
+}
 
 fn send(
     line: &str,
