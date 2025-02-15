@@ -81,11 +81,6 @@ pub fn ingest_loop(
     }
 }
 
-static EMPTY_STRING: LazyLock<Arc<Box<str>>> = LazyLock::new(|| {
-    let item: Box<str> = "".into();
-    Arc::new(item)
-});
-
 fn stitch(old: &mut String, new: &str, line_ending: u8, opts: &SendRawOrBuild, tx_item: &Sender<Arc<dyn SkimItem>>) {
     if !new.starts_with(line_ending as char) {
         old.push_str(new);
@@ -101,6 +96,9 @@ fn stitch(old: &mut String, new: &str, line_ending: u8, opts: &SendRawOrBuild, t
 
     old.clear();
 }
+
+static EMPTY_STRING: &str = "";
+static ARC_EMPTY_STRING: LazyLock<Arc<Box<str>>> = LazyLock::new(|| Arc::new(EMPTY_STRING.into()));
 
 fn send(
     line: &str,
@@ -118,7 +116,7 @@ fn send(
             );
             Arc::new(item)
         }
-        SendRawOrBuild::Raw if line.is_empty() => EMPTY_STRING.clone(),
+        SendRawOrBuild::Raw if line.is_empty() => ARC_EMPTY_STRING.clone(),
         SendRawOrBuild::Raw => {
             let item: Box<str> = line.into();
             Arc::new(item)
