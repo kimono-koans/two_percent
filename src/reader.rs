@@ -71,8 +71,9 @@ impl ReaderControl {
         let opt_thread_ingest = self.thread_ingest.take();
 
         rayon::spawn(move || {
-            let _ = drop(opt_thread_reader.and_then(|reader_handle| reader_handle.join().ok()));
-            let _ = drop(opt_thread_ingest.and_then(|ingest_handle| ingest_handle.join().ok()));
+            drop(opt_thread_reader.and_then(|reader_handle| reader_handle.join().ok()));
+            drop(opt_thread_ingest.and_then(|ingest_handle| ingest_handle.join().ok()));
+
             #[cfg(feature = "malloc_trim")]
             #[cfg(target_os = "linux")]
             #[cfg(target_env = "gnu")]
