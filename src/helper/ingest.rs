@@ -2,7 +2,7 @@
 use std::io::BufRead;
 use std::sync::{Arc, LazyLock};
 
-use crossbeam_channel::{SendError, Sender};
+use crossbeam_channel::Sender;
 
 use crate::field::FieldRange;
 use crate::SkimItem;
@@ -29,7 +29,7 @@ pub struct BuildOptions<'a> {
 pub fn ingest_loop(
     mut source: Box<dyn BufRead + Send>,
     line_ending: u8,
-    tx_item: Sender<Arc<dyn SkimItem>>,
+    tx_item: Sender<Vec<Arc<dyn SkimItem>>>,
     opts: SendRawOrBuild,
 ) {
     let mut frag_buffer = String::with_capacity(128);
@@ -43,31 +43,44 @@ pub fn ingest_loop(
 
                 let string = std::str::from_utf8(bytes_buffer).expect("Could not convert bytes to valid UTF8.");
 
-                match string.rsplit_once(line_ending as char) {
+                let vec = match string.rsplit_once(line_ending as char) {
                     Some((main, frag)) => {
-                        let mut iter = main.split(line_ending as char);
-
-                        if !frag_buffer.is_empty() {
-                            if let Some(first) = iter.next() {
-                                stitch(&mut frag_buffer, first, line_ending, &opts, &tx_item);
+                        let buffer = if !frag_buffer.is_empty() {
+                            match main.split_once(line_ending as char) {
+                                Some((first, rest)) => {
+                                    stitch(&mut frag_buffer, first, line_ending, &opts, &tx_item);
+                                    rest
+                                }
+                                None => {
+                                    stitch(&mut frag_buffer, main, line_ending, &opts, &tx_item);
+                                    continue;
+                                }
                             }
-                        }
+                        } else {
+                            main
+                        };
 
-                        iter.try_for_each(|line| send(line, &opts, &tx_item))
-                            .expect("There was an error sending text from the ingest thread to the receiver.");
-
+                        // we have cleared the frag buffer by this point we can append a new string
                         frag_buffer.push_str(frag);
-                    }
-                    _ => {
-                        if !frag_buffer.is_empty() {
-                            stitch(&mut frag_buffer, string, line_ending, &opts, &tx_item);
-                            continue;
-                        }
 
-                        send(string, &opts, &tx_item)
-                            .expect("There was an error sending text from the ingest thread to the receiver.");
+                        buffer
+                            .split(line_ending as char)
+                            .map(|line| into_skim_item(line, &opts))
+                            .into_iter()
+                            .collect()
                     }
-                }
+                    None if !frag_buffer.is_empty() => {
+                        stitch(&mut frag_buffer, string, line_ending, &opts, &tx_item);
+                        continue;
+                    }
+                    None => {
+                        vec![into_skim_item(string, &opts)]
+                    }
+                };
+
+                tx_item
+                    .send(vec)
+                    .expect("There was an error sending text from the ingest thread to the receiver.");
 
                 source.consume(buffer_len);
             }
@@ -81,17 +94,26 @@ pub fn ingest_loop(
     }
 }
 
-fn stitch(old: &mut String, new: &str, line_ending: u8, opts: &SendRawOrBuild, tx_item: &Sender<Arc<dyn SkimItem>>) {
+fn stitch(
+    old: &mut String,
+    new: &str,
+    line_ending: u8,
+    opts: &SendRawOrBuild,
+    tx_item: &Sender<Vec<Arc<dyn SkimItem>>>,
+) {
     if !new.starts_with(line_ending as char) {
         old.push_str(new);
-        send(&old, &opts, &tx_item).expect("There was an error sending text from the ingest thread to the receiver.");
+        tx_item
+            .send(vec![into_skim_item(old, opts)])
+            .expect("There was an error sending text from the ingest thread to the receiver.");
         old.clear();
         return;
     }
 
-    [&old, new]
-        .iter()
-        .try_for_each(|line| send(line, &opts, &tx_item))
+    let items = [&old, new].iter().map(|line| into_skim_item(line, opts)).collect();
+
+    tx_item
+        .send(items)
         .expect("There was an error sending text from the ingest thread to the receiver.");
 
     old.clear();
@@ -100,12 +122,8 @@ fn stitch(old: &mut String, new: &str, line_ending: u8, opts: &SendRawOrBuild, t
 static EMPTY_STRING: &str = "";
 static ARC_EMPTY_STRING: LazyLock<Arc<Box<str>>> = LazyLock::new(|| Arc::new(EMPTY_STRING.into()));
 
-fn send(
-    line: &str,
-    opts: &SendRawOrBuild,
-    tx_item: &Sender<Arc<dyn SkimItem>>,
-) -> Result<(), SendError<Arc<dyn SkimItem>>> {
-    let item: Arc<dyn SkimItem> = match opts {
+fn into_skim_item(line: &str, opts: &SendRawOrBuild) -> Arc<dyn SkimItem> {
+    match opts {
         SendRawOrBuild::Build(opts) => {
             let item = DefaultSkimItem::new(
                 line,
@@ -121,7 +139,5 @@ fn send(
             let item: Box<str> = line.into();
             Arc::new(item)
         }
-    };
-
-    tx_item.send(item)
+    }
 }

@@ -177,7 +177,7 @@ impl SkimItemReader {
         &self,
         components_to_stop: Arc<AtomicUsize>,
         input: CollectorInput,
-    ) -> (Receiver<Arc<dyn SkimItem>>, Sender<i32>, Option<JoinHandle<()>>) {
+    ) -> (Receiver<Vec<Arc<dyn SkimItem>>>, Sender<i32>, Option<JoinHandle<()>>) {
         let (tx_interrupt, rx_interrupt) = bounded(CMD_CHANNEL_SIZE);
         let (tx_item, rx_item): (SkimItemSender, SkimItemReceiver) = unbounded();
 
@@ -240,7 +240,7 @@ impl SkimItemReader {
                             if has_error {
                                 let output = child.wait_with_output().expect("could not retrieve error message");
                                 for line in String::from_utf8_lossy(&output.stderr).lines() {
-                                    let _ = tx_item.send(Arc::new(line.to_string()));
+                                    let _ = tx_item.send(vec![Arc::new(line.to_string())]);
                                 }
                             }
                         }

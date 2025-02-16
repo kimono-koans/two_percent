@@ -278,8 +278,8 @@ pub trait Selector: Send + Sync {
 }
 
 //------------------------------------------------------------------------------
-pub type SkimItemSender = Sender<Arc<dyn SkimItem>>;
-pub type SkimItemReceiver = Receiver<Arc<dyn SkimItem>>;
+pub type SkimItemSender = Sender<Vec<Arc<dyn SkimItem>>>;
+pub type SkimItemReceiver = Receiver<Vec<Arc<dyn SkimItem>>>;
 
 pub struct Skim {}
 

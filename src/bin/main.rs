@@ -565,6 +565,7 @@ pub fn filter(
 
     stream_of_item
         .into_iter()
+        .flatten()
         .enumerate()
         .filter_map(|(idx, item)| engine.match_item(item.as_ref(), idx).map(|result| (item, result)))
         .try_for_each(|(item, _match_result)| {
