@@ -69,12 +69,11 @@ pub fn ingest_loop(
                             .into_iter()
                             .collect()
                     }
-                    _ => {
-                        if !frag_buffer.is_empty() {
-                            stitch(&mut frag_buffer, string, line_ending, &opts, &tx_item);
-                            continue;
-                        }
-
+                    None if !frag_buffer.is_empty() => {
+                        stitch(&mut frag_buffer, string, line_ending, &opts, &tx_item);
+                        continue;
+                    }
+                    None => {
                         vec![into_skim_item(string, &opts)]
                     }
                 };
