@@ -61,6 +61,9 @@ pub fn ingest_loop(
                             main
                         };
 
+                        // we have cleared the frag buffer by this point we can append a new string
+                        frag_buffer.push_str(frag);
+
                         buffer
                             .split(line_ending as char)
                             .map(|line| into_skim_item(line, &opts))
@@ -72,8 +75,6 @@ pub fn ingest_loop(
                                     .send(vec)
                                     .expect("There was an error sending text from the ingest thread to the receiver.");
                             });
-
-                        frag_buffer.push_str(frag);
                     }
                     _ => {
                         if !frag_buffer.is_empty() {
