@@ -6,7 +6,6 @@ use crossbeam_channel::Sender;
 
 use crate::field::FieldRange;
 use crate::SkimItem;
-use itertools::Itertools;
 use regex::Regex;
 use std::io::ErrorKind;
 
@@ -64,17 +63,15 @@ pub fn ingest_loop(
                         // we have cleared the frag buffer by this point we can append a new string
                         frag_buffer.push_str(frag);
 
-                        buffer
+                        let vec = buffer
                             .split(line_ending as char)
                             .map(|line| into_skim_item(line, &opts))
-                            .chunks(2048)
                             .into_iter()
-                            .map(|chunk| chunk.collect())
-                            .for_each(|vec| {
-                                tx_item
-                                    .send(vec)
-                                    .expect("There was an error sending text from the ingest thread to the receiver.");
-                            });
+                            .collect();
+
+                        tx_item
+                            .send(vec)
+                            .expect("There was an error sending text from the ingest thread to the receiver.");
                     }
                     _ => {
                         if !frag_buffer.is_empty() {
