@@ -43,7 +43,7 @@ pub fn ingest_loop(
 
                 let string = std::str::from_utf8(bytes_buffer).expect("Could not convert bytes to valid UTF8.");
 
-                match string.rsplit_once(line_ending as char) {
+                let vec = match string.rsplit_once(line_ending as char) {
                     Some((main, frag)) => {
                         let buffer = if !frag_buffer.is_empty() {
                             match main.split_once(line_ending as char) {
@@ -63,15 +63,11 @@ pub fn ingest_loop(
                         // we have cleared the frag buffer by this point we can append a new string
                         frag_buffer.push_str(frag);
 
-                        let vec = buffer
+                        buffer
                             .split(line_ending as char)
                             .map(|line| into_skim_item(line, &opts))
                             .into_iter()
-                            .collect();
-
-                        tx_item
-                            .send(vec)
-                            .expect("There was an error sending text from the ingest thread to the receiver.");
+                            .collect()
                     }
                     _ => {
                         if !frag_buffer.is_empty() {
@@ -79,11 +75,13 @@ pub fn ingest_loop(
                             continue;
                         }
 
-                        tx_item
-                            .send(vec![into_skim_item(string, &opts)])
-                            .expect("There was an error sending text from the ingest thread to the receiver.");
+                        vec![into_skim_item(string, &opts)]
                     }
-                }
+                };
+
+                tx_item
+                    .send(vec)
+                    .expect("There was an error sending text from the ingest thread to the receiver.");
 
                 source.consume(buffer_len);
             }
