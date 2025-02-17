@@ -49,7 +49,7 @@ pub fn ingest_loop(
                             break;
                         }
                         Err(err) => {
-                            eprintln!("Removing bytes which are invalid UTF8: {:?}", err);
+                            debug!("Removing bytes which are invalid UTF8: {:?}", err);
 
                             let (valid, after_valid) = bytes_buffer.split_at(err.valid_up_to());
                             let pre_checked = unsafe { std::str::from_utf8_unchecked(valid) };
