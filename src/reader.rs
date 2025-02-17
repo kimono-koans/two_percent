@@ -100,7 +100,7 @@ impl ReaderControl {
     }
 
     pub fn is_empty(&self) -> bool {
-        if let Ok(locked) = self.items.read() {
+        if let Ok(locked) = self.items.try_read() {
             return locked.is_empty();
         }
 
