@@ -38,58 +38,34 @@ pub fn ingest_loop(
         // first, read lots of bytes into the buffer
         match source.fill_buf() {
             Ok(bytes_buffer) if bytes_buffer.is_empty() => break,
-            Ok(bytes_buffer) => {
+            Ok(ref mut bytes_buffer) => {
                 let buffer_len = bytes_buffer.len();
 
-                let string = match std::str::from_utf8(bytes_buffer) {
-                    Ok(string) => string,
-                    Err(err) => {
-                        source.consume(buffer_len);
-                        eprintln!("Could not convert bytes to valid UTF8: {:?}", err);
-                        continue;
-                    }
-                };
+                loop {
+                    match std::str::from_utf8(bytes_buffer) {
+                        Ok(string) => {
+                            process(string, &mut frag_buffer, line_ending, &tx_item, &opts);
+                            source.consume(buffer_len);
+                            break;
+                        }
+                        Err(err) => {
+                            eprintln!("Could not convert bytes to valid UTF8: {:?}", err);
 
-                let vec = match string.rsplit_once(line_ending as char) {
-                    Some((main, frag)) => {
-                        let buffer = if !frag_buffer.is_empty() {
-                            match main.split_once(line_ending as char) {
-                                Some((first, rest)) => {
-                                    stitch(&mut frag_buffer, first, line_ending, &opts, &tx_item);
-                                    rest
-                                }
-                                None => {
-                                    stitch(&mut frag_buffer, main, line_ending, &opts, &tx_item);
-                                    continue;
-                                }
+                            let (valid, after_valid) = bytes_buffer.split_at(err.valid_up_to());
+                            let pre_checked = unsafe { std::str::from_utf8_unchecked(valid) };
+
+                            process(pre_checked, &mut frag_buffer, line_ending, &tx_item, &opts);
+
+                            if let Some(invalid_sequence_length) = err.error_len() {
+                                *bytes_buffer = &after_valid[invalid_sequence_length..]
+                            } else {
+                                break;
                             }
-                        } else {
-                            main
-                        };
 
-                        // we have cleared the frag buffer by this point we can append a new string
-                        frag_buffer.push_str(frag);
-
-                        buffer
-                            .split(line_ending as char)
-                            .map(|line| into_skim_item(line, &opts))
-                            .into_iter()
-                            .collect()
-                    }
-                    None if !frag_buffer.is_empty() => {
-                        stitch(&mut frag_buffer, string, line_ending, &opts, &tx_item);
-                        continue;
-                    }
-                    None => {
-                        vec![into_skim_item(string, &opts)]
-                    }
-                };
-
-                tx_item
-                    .send(vec)
-                    .expect("There was an error sending text from the ingest thread to the receiver.");
-
-                source.consume(buffer_len);
+                            continue;
+                        }
+                    };
+                }
             }
             Err(err) => match err.kind() {
                 ErrorKind::Interrupted => continue,
@@ -99,6 +75,53 @@ pub fn ingest_loop(
             },
         }
     }
+}
+
+fn process(
+    base: &str,
+    mut frag_buffer: &mut String,
+    line_ending: u8,
+    tx_item: &Sender<Vec<Arc<dyn SkimItem>>>,
+    opts: &SendRawOrBuild,
+) {
+    let vec = match base.rsplit_once(line_ending as char) {
+        Some((main, frag)) => {
+            let buffer = if !frag_buffer.is_empty() {
+                match main.split_once(line_ending as char) {
+                    Some((first, rest)) => {
+                        stitch(&mut frag_buffer, first, line_ending, &opts, &tx_item);
+                        rest
+                    }
+                    None => {
+                        stitch(&mut frag_buffer, main, line_ending, &opts, &tx_item);
+                        return;
+                    }
+                }
+            } else {
+                main
+            };
+
+            // we have cleared the frag buffer by this point we can append a new string
+            frag_buffer.push_str(frag);
+
+            buffer
+                .split(line_ending as char)
+                .map(|line| into_skim_item(line, &opts))
+                .into_iter()
+                .collect()
+        }
+        None if !frag_buffer.is_empty() => {
+            stitch(&mut frag_buffer, base, line_ending, &opts, &tx_item);
+            return;
+        }
+        None => {
+            vec![into_skim_item(base, &opts)]
+        }
+    };
+
+    tx_item
+        .send(vec)
+        .expect("There was an error sending text from the ingest thread to the receiver.")
 }
 
 fn stitch(
