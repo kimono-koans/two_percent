@@ -41,7 +41,14 @@ pub fn ingest_loop(
             Ok(bytes_buffer) => {
                 let buffer_len = bytes_buffer.len();
 
-                let string = std::str::from_utf8(bytes_buffer).expect("Could not convert bytes to valid UTF8.");
+                let string = match std::str::from_utf8(bytes_buffer) {
+                    Ok(string) => string,
+                    Err(err) => {
+                        source.consume(buffer_len);
+                        eprintln!("Could not convert bytes to valid UTF8: {:?}", err);
+                        continue;
+                    }
+                };
 
                 let vec = match string.rsplit_once(line_ending as char) {
                     Some((main, frag)) => {
