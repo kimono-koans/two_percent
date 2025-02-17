@@ -34,18 +34,22 @@ pub fn ingest_loop(
 ) {
     let mut frag_buffer = String::with_capacity(128);
 
-    loop {
+    'outer: loop {
         // first, read lots of bytes into the buffer
         match source.fill_buf() {
             Ok(bytes_buffer) if bytes_buffer.is_empty() => break,
             Ok(ref mut bytes_buffer) => {
                 let buffer_len = bytes_buffer.len();
 
-                loop {
+                'inner: loop {
+                    if bytes_buffer.is_empty() {
+                        break 'outer;
+                    }
+
                     match std::str::from_utf8(bytes_buffer) {
                         Ok(string) => {
                             process(string, &mut frag_buffer, line_ending, &tx_item, &opts);
-                            break;
+                            break 'inner;
                         }
                         Err(err) => {
                             debug!("Removing bytes which are invalid UTF8: {:?}", err);
@@ -59,7 +63,7 @@ pub fn ingest_loop(
                                 *bytes_buffer = &after_valid[invalid_sequence_length..];
                             }
 
-                            continue;
+                            continue 'inner;
                         }
                     };
                 }
@@ -67,9 +71,9 @@ pub fn ingest_loop(
                 source.consume(buffer_len);
             }
             Err(err) => match err.kind() {
-                ErrorKind::Interrupted => continue,
+                ErrorKind::Interrupted => continue 'outer,
                 ErrorKind::UnexpectedEof | _ => {
-                    break;
+                    break 'outer;
                 }
             },
         }
