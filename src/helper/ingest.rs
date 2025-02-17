@@ -49,7 +49,7 @@ pub fn ingest_loop(
                             break;
                         }
                         Err(err) => {
-                            eprintln!("Could not convert bytes to valid UTF8: {:?}", err);
+                            eprintln!("Removing bytes which are invalid UTF8: {:?}", err);
 
                             let (valid, after_valid) = bytes_buffer.split_at(err.valid_up_to());
                             let pre_checked = unsafe { std::str::from_utf8_unchecked(valid) };
@@ -57,12 +57,11 @@ pub fn ingest_loop(
                             process(pre_checked, &mut frag_buffer, line_ending, &tx_item, &opts);
 
                             if let Some(invalid_sequence_length) = err.error_len() {
-                                *bytes_buffer = &after_valid[invalid_sequence_length..]
-                            } else {
-                                break;
+                                *bytes_buffer = &after_valid[invalid_sequence_length..];
+                                continue;
                             }
 
-                            continue;
+                            break;
                         }
                     };
                 }
