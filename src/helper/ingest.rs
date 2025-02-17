@@ -45,7 +45,6 @@ pub fn ingest_loop(
                     match std::str::from_utf8(bytes_buffer) {
                         Ok(string) => {
                             process(string, &mut frag_buffer, line_ending, &tx_item, &opts);
-                            source.consume(buffer_len);
                             break;
                         }
                         Err(err) => {
@@ -58,13 +57,14 @@ pub fn ingest_loop(
 
                             if let Some(invalid_sequence_length) = err.error_len() {
                                 *bytes_buffer = &after_valid[invalid_sequence_length..];
-                                continue;
                             }
 
-                            break;
+                            continue;
                         }
                     };
                 }
+
+                source.consume(buffer_len);
             }
             Err(err) => match err.kind() {
                 ErrorKind::Interrupted => continue,
