@@ -82,7 +82,7 @@ impl ReaderControl {
     }
 
     pub fn take(&mut self) -> Vec<Arc<dyn SkimItem>> {
-        if let Ok(mut locked) = self.items.write() {
+        if let Ok(mut locked) = self.items.try_write() {
             return std::mem::take(&mut locked);
         }
 
