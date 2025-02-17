@@ -29,8 +29,8 @@ pub struct BuildOptions<'a> {
 pub fn ingest_loop(
     mut source: Box<dyn BufRead + Send>,
     line_ending: u8,
-    tx_item: Sender<Vec<Arc<dyn SkimItem>>>,
-    opts: SendRawOrBuild,
+    tx_item: &Sender<Vec<Arc<dyn SkimItem>>>,
+    opts: &SendRawOrBuild,
 ) {
     let mut frag_buffer = String::with_capacity(128);
 

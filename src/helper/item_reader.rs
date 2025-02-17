@@ -159,7 +159,7 @@ impl SkimItemReader {
         let line_ending = self.option.line_ending;
 
         let ingest_handle = thread::spawn(move || {
-            ingest_loop(source, line_ending, tx_item, SendRawOrBuild::Raw);
+            ingest_loop(source, line_ending, &tx_item, &SendRawOrBuild::Raw);
 
             #[cfg(feature = "malloc_trim")]
             #[cfg(target_os = "linux")]
@@ -200,7 +200,7 @@ impl SkimItemReader {
                         delimiter: &option.delimiter,
                     };
 
-                    ingest_loop(source, option.line_ending, tx_item, SendRawOrBuild::Build(opts));
+                    ingest_loop(source, option.line_ending, &tx_item, &SendRawOrBuild::Build(opts));
 
                     let _ = tx_interrupt_clone.send(1); // ensure the waiting thread will exit
                     components_to_stop.fetch_sub(1, Ordering::SeqCst);
