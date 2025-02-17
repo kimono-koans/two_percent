@@ -184,7 +184,8 @@ fn collect_item(
                     i if i == item_channel && !rx_item.is_empty() => {
                         match items_strong.try_lock() {
                             Ok(mut locked) => {
-                                rx_item.try_iter().for_each(|mut vec| locked.append(&mut vec));
+                                let mut flattened = rx_item.try_iter().flatten().collect();
+                                locked.append(&mut flattened);
                                 drop(locked);
 
                                 // slow path
