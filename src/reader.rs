@@ -10,7 +10,7 @@ use crossbeam_channel::{unbounded, Select, Sender};
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::{Arc, RwLock, TryLockError, Weak};
+use std::sync::{Arc, Mutex, TryLockError, Weak};
 use std::thread::{self, sleep, JoinHandle};
 use std::time::Duration;
 
@@ -42,7 +42,7 @@ pub struct ReaderControl {
     tx_interrupt: Sender<i32>,
     tx_interrupt_cmd: Option<Sender<i32>>,
     components_to_stop: Arc<AtomicUsize>,
-    items: Arc<RwLock<Vec<Arc<dyn SkimItem>>>>,
+    items: Arc<Mutex<Vec<Arc<dyn SkimItem>>>>,
     thread_reader: Option<JoinHandle<()>>,
     thread_ingest: Option<JoinHandle<()>>,
 }
@@ -82,7 +82,7 @@ impl ReaderControl {
     }
 
     pub fn take(&mut self) -> Vec<Arc<dyn SkimItem>> {
-        if let Ok(mut locked) = self.items.try_write() {
+        if let Ok(mut locked) = self.items.try_lock() {
             return std::mem::take(&mut locked);
         }
 
@@ -90,7 +90,7 @@ impl ReaderControl {
     }
 
     pub fn transfer_items(&mut self, item_pool: &Arc<ItemPool>) {
-        if let Ok(mut locked) = self.items.try_write() {
+        if let Ok(mut locked) = self.items.try_lock() {
             item_pool.append(&mut locked);
         }
     }
@@ -100,7 +100,7 @@ impl ReaderControl {
     }
 
     pub fn is_empty(&self) -> bool {
-        if let Ok(locked) = self.items.try_read() {
+        if let Ok(locked) = self.items.try_lock() {
             return locked.is_empty();
         }
 
@@ -134,7 +134,7 @@ impl Reader {
         mark_new_run(cmd);
 
         let components_to_stop: Arc<AtomicUsize> = Arc::new(AtomicUsize::new(0));
-        let items_strong = Arc::new(RwLock::new(Vec::with_capacity(ITEMS_INITIAL_CAPACITY)));
+        let items_strong = Arc::new(Mutex::new(Vec::with_capacity(ITEMS_INITIAL_CAPACITY)));
         let items_weak = Arc::downgrade(&items_strong);
 
         let (rx_item, tx_interrupt_cmd, opt_ingest_handle) =
@@ -162,7 +162,7 @@ impl Reader {
 fn collect_item(
     components_to_stop: Arc<AtomicUsize>,
     rx_item: SkimItemReceiver,
-    items_weak: Weak<RwLock<Vec<Arc<dyn SkimItem>>>>,
+    items_weak: Weak<Mutex<Vec<Arc<dyn SkimItem>>>>,
 ) -> (Sender<i32>, JoinHandle<()>) {
     let (tx_interrupt, rx_interrupt) = unbounded();
 
@@ -182,7 +182,7 @@ fn collect_item(
             loop {
                 match sel.ready() {
                     i if i == item_channel && !rx_item.is_empty() => {
-                        match items_strong.try_write() {
+                        match items_strong.try_lock() {
                             Ok(mut locked) => {
                                 rx_item.try_iter().for_each(|mut vec| locked.append(&mut vec));
                                 drop(locked);
