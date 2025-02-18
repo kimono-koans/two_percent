@@ -165,7 +165,11 @@ impl Matcher {
                     }
                 }
 
-                stopped.store(true, Ordering::SeqCst);
+                while stopped
+                    .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+                    .is_err()
+                {}
+
                 let _ = tx_heartbeat.send((Key::Null, Event::EvHeartBeat));
             });
         });
