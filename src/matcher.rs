@@ -57,7 +57,7 @@ impl MatcherControl {
 
     #[allow(clippy::wrong_self_convention)]
     pub fn into_items(mut self) -> Vec<MatchedItem> {
-        while !self.stopped.load(Ordering::SeqCst) {}
+        while !self.stopped.load(Ordering::Relaxed) {}
         self.take()
     }
 }
