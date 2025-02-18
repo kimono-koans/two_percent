@@ -51,12 +51,13 @@ impl MatcherControl {
     }
 
     pub fn stopped(&self) -> bool {
-        self.stopped.load(Ordering::Relaxed)
+        let is_stopped = self.stopped.load(Ordering::Relaxed);
+        is_stopped
     }
 
     #[allow(clippy::wrong_self_convention)]
     pub fn into_items(mut self) -> Vec<MatchedItem> {
-        while !self.stopped.load(Ordering::Relaxed) {}
+        while !self.stopped.load(Ordering::SeqCst) {}
         self.take()
     }
 }
@@ -155,7 +156,7 @@ impl Matcher {
                         .flatten_iter();
 
                     if let Some(matched_items_strong) = Weak::upgrade(&matched_items_weak) {
-                        if !stopped_ref.load(Ordering::Relaxed) {
+                        if !stopped_ref.load(Ordering::SeqCst) {
                             let mut pool = matched_items_strong.lock();
                             pool.clear();
                             pool.par_extend(par_iter);
@@ -164,8 +165,8 @@ impl Matcher {
                     }
                 }
 
-                let _ = tx_heartbeat.send((Key::Null, Event::EvHeartBeat));
                 stopped.store(true, Ordering::SeqCst);
+                let _ = tx_heartbeat.send((Key::Null, Event::EvHeartBeat));
             });
         });
 
