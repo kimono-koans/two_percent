@@ -814,10 +814,10 @@ impl Model {
                     old_matcher.kill();
                     let mut old_items = old_matcher.into_items();
                     old_items.clear();
-                    old_items
-                } else {
-                    Vec::with_capacity(self.item_pool.len())
+                    return old_items;
                 }
+
+                Vec::with_capacity(self.item_pool.len())
             })
             .unwrap_or_else(|| Vec::with_capacity(self.item_pool.len()));
 
