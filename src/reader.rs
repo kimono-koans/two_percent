@@ -215,12 +215,11 @@ fn collect_item(
                 }
                 i if i == item_channel => match rx_item.try_recv() {
                     Err(TryRecvError::Disconnected) => break,
-                    _ => {
+                    Err(TryRecvError::Empty) | _ => {
                         empty_count += 1;
                         continue;
                     }
                 },
-                i if i == interrupt_channel && !rx_item.is_empty() => continue,
                 i if i == interrupt_channel => break,
                 _ => unreachable!(),
             }
