@@ -177,51 +177,52 @@ fn collect_item(
         let item_channel = sel.recv(&rx_item);
         let interrupt_channel = sel.recv(&rx_interrupt);
         let mut empty_count = 0usize;
+        let Some(items_strong) = Weak::upgrade(&items_weak) else {
+            return;
+        };
 
-        if let Some(items_strong) = Weak::upgrade(&items_weak) {
-            loop {
-                match sel.ready() {
-                    i if i == item_channel && !rx_item.is_empty() => {
-                        match items_strong.try_lock() {
-                            Ok(mut locked) => {
-                                let mut flattened = rx_item.try_iter().flatten().collect();
-                                locked.append(&mut flattened);
-                                drop(locked);
+        loop {
+            match sel.ready() {
+                i if i == item_channel && !rx_item.is_empty() => {
+                    match items_strong.try_lock() {
+                        Ok(mut locked) => {
+                            let mut flattened = rx_item.try_iter().flatten().collect();
+                            locked.append(&mut flattened);
+                            drop(locked);
 
-                                // slow path
-                                if empty_count >= 1 {
-                                    // faster for slow path but not for fast path
-                                    sleep(SLEEP_SLOW);
-                                    continue;
-                                }
-
-                                // fast path
-                                sleep(SLEEP_FAST);
+                            // slow path
+                            if empty_count >= 1 {
+                                // faster for slow path but not for fast path
+                                sleep(SLEEP_SLOW);
                                 continue;
                             }
-                            Err(err) => match err {
-                                TryLockError::Poisoned(_) => {
-                                    eprintln!("ERROR: The lock could not be acquired because another thread failed while holding the lock.");
-                                    std::process::exit(1)
-                                }
-                                TryLockError::WouldBlock => {
-                                    sleep(SLEEP_SLOW);
-                                    continue;
-                                }
-                            },
-                        }
-                    }
-                    i if i == item_channel => match rx_item.try_recv() {
-                        Err(TryRecvError::Disconnected) => break,
-                        _ => {
-                            empty_count += 1;
+
+                            // fast path
+                            sleep(SLEEP_FAST);
                             continue;
                         }
-                    },
-                    i if i == interrupt_channel && !rx_item.is_empty() => continue,
-                    i if i == interrupt_channel => break,
-                    _ => unreachable!(),
+                        Err(err) => match err {
+                            TryLockError::Poisoned(_) => {
+                                eprintln!("ERROR: The lock could not be acquired because another thread failed while holding the lock.");
+                                std::process::exit(1)
+                            }
+                            TryLockError::WouldBlock => {
+                                sleep(SLEEP_SLOW);
+                                continue;
+                            }
+                        },
+                    }
                 }
+                i if i == item_channel => match rx_item.try_recv() {
+                    Err(TryRecvError::Disconnected) => break,
+                    _ => {
+                        empty_count += 1;
+                        continue;
+                    }
+                },
+                i if i == interrupt_channel && !rx_item.is_empty() => continue,
+                i if i == interrupt_channel => break,
+                _ => unreachable!(),
             }
         }
 
