@@ -1,11 +1,10 @@
+use crate::field::FieldRange;
+use crate::SkimItem;
 /// helper for turn a BufRead into a skim stream
 use std::io::BufRead;
 use std::sync::{Arc, LazyLock};
 
 use crossbeam_channel::Sender;
-
-use crate::field::FieldRange;
-use crate::SkimItem;
 use regex::Regex;
 use std::io::ErrorKind;
 
@@ -77,6 +76,12 @@ pub fn ingest_loop(
                 }
             },
         }
+    }
+
+    if !frag_buffer.is_empty() {
+        tx_item
+            .send(vec![into_skim_item(&frag_buffer, opts)])
+            .expect("There was an error sending text from the ingest thread to the receiver.")
     }
 }
 
