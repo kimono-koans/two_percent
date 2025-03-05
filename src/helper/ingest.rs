@@ -79,9 +79,8 @@ pub fn ingest_loop(
     }
 
     if !frag_buffer.is_empty() {
-        tx_item
-            .send(vec![into_skim_item(&frag_buffer, opts)])
-            .expect("There was an error sending text from the ingest thread to the receiver.")
+        let items = vec![into_skim_item(&frag_buffer, opts)];
+        send(items, tx_item);
     }
 }
 
@@ -127,9 +126,7 @@ fn process(
         }
     };
 
-    tx_item
-        .send(vec)
-        .expect("There was an error sending text from the ingest thread to the receiver.")
+    send(vec, tx_item);
 }
 
 fn stitch(
@@ -141,18 +138,15 @@ fn stitch(
 ) {
     if !new.starts_with(line_ending as char) {
         old.push_str(new);
-        tx_item
-            .send(vec![into_skim_item(old, opts)])
-            .expect("There was an error sending text from the ingest thread to the receiver.");
+        let items = vec![into_skim_item(old, opts)];
+        send(items, tx_item);
         old.clear();
         return;
     }
 
     let items = [&old, new].iter().map(|line| into_skim_item(line, opts)).collect();
 
-    tx_item
-        .send(items)
-        .expect("There was an error sending text from the ingest thread to the receiver.");
+    send(items, tx_item);
 
     old.clear();
 }
@@ -178,4 +172,8 @@ fn into_skim_item(line: &str, opts: &SendRawOrBuild) -> Arc<dyn SkimItem> {
             Arc::new(item)
         }
     }
+}
+
+fn send(vec: Vec<Arc<dyn SkimItem>>, tx_item: &Sender<Vec<Arc<dyn SkimItem>>>) {
+    let _ = tx_item.send(vec);
 }
