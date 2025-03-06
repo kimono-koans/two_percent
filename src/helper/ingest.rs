@@ -151,6 +151,9 @@ fn stitch(
     Ok(())
 }
 
+static EMPTY_STRING: &str = "";
+static ARC_EMPTY_STRING: LazyLock<Arc<Box<str>>> = LazyLock::new(|| Arc::new(EMPTY_STRING.into()));
+
 fn into_skim_item(line: &str, opts: &SendRawOrBuild) -> Arc<dyn SkimItem> {
     match opts {
         SendRawOrBuild::Build(opts) => {
@@ -163,6 +166,7 @@ fn into_skim_item(line: &str, opts: &SendRawOrBuild) -> Arc<dyn SkimItem> {
             );
             Arc::new(item)
         }
+        SendRawOrBuild::Raw if line.is_empty() => ARC_EMPTY_STRING.clone(),
         SendRawOrBuild::Raw => {
             let item: Box<str> = line.into();
             Arc::new(item)
