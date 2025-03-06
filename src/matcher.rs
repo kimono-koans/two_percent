@@ -165,10 +165,7 @@ impl Matcher {
                     }
                 }
 
-                while stopped
-                    .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
-                    .is_err()
-                {}
+                stopped.store(true, Ordering::SeqCst);
 
                 let _ = tx_heartbeat.send((Key::Null, Event::EvHeartBeat));
             });
