@@ -41,13 +41,9 @@ pub fn ingest_loop(
                 let buffer_len = bytes_buffer.len();
 
                 'inner: loop {
-                    if bytes_buffer.is_empty() {
-                        break 'outer;
-                    }
-
                     match std::str::from_utf8(bytes_buffer) {
                         Ok(string) => {
-                            process(string, &mut frag_buffer, line_ending, &tx_item, &opts);
+                            let _ = process(string, &mut frag_buffer, line_ending, &tx_item, &opts);
                             break 'inner;
                         }
                         Err(err) => {
@@ -56,7 +52,9 @@ pub fn ingest_loop(
                             let (valid, after_valid) = bytes_buffer.split_at(err.valid_up_to());
                             let pre_checked = unsafe { std::str::from_utf8_unchecked(valid) };
 
-                            process(pre_checked, &mut frag_buffer, line_ending, &tx_item, &opts);
+                            if process(pre_checked, &mut frag_buffer, line_ending, &tx_item, &opts).is_err() {
+                                break 'inner;
+                            }
 
                             if let Some(invalid_sequence_length) = err.error_len() {
                                 *bytes_buffer = &after_valid[invalid_sequence_length..];
@@ -80,7 +78,7 @@ pub fn ingest_loop(
 
     if !frag_buffer.is_empty() {
         let items = vec![into_skim_item(&frag_buffer, opts)];
-        send(items, tx_item);
+        let _ = send(items, tx_item);
     }
 }
 
@@ -90,18 +88,18 @@ fn process(
     line_ending: u8,
     tx_item: &Sender<Vec<Arc<dyn SkimItem>>>,
     opts: &SendRawOrBuild,
-) {
+) -> Result<(), crossbeam_channel::SendError<Vec<Arc<dyn SkimItem>>>> {
     let vec = match base.rsplit_once(line_ending as char) {
         Some((main, frag)) => {
             let buffer = if !frag_buffer.is_empty() {
                 match main.split_once(line_ending as char) {
                     Some((first, rest)) => {
-                        stitch(&mut frag_buffer, first, line_ending, &opts, &tx_item);
+                        stitch(&mut frag_buffer, first, line_ending, &opts, &tx_item)?;
                         rest
                     }
                     None => {
-                        stitch(&mut frag_buffer, main, line_ending, &opts, &tx_item);
-                        return;
+                        stitch(&mut frag_buffer, main, line_ending, &opts, &tx_item)?;
+                        return Ok(());
                     }
                 }
             } else {
@@ -118,15 +116,15 @@ fn process(
                 .collect()
         }
         None if !frag_buffer.is_empty() => {
-            stitch(&mut frag_buffer, base, line_ending, &opts, &tx_item);
-            return;
+            stitch(&mut frag_buffer, base, line_ending, &opts, &tx_item)?;
+            return Ok(());
         }
         None => {
             vec![into_skim_item(base, &opts)]
         }
     };
 
-    send(vec, tx_item);
+    send(vec, tx_item)
 }
 
 fn stitch(
@@ -135,24 +133,23 @@ fn stitch(
     line_ending: u8,
     opts: &SendRawOrBuild,
     tx_item: &Sender<Vec<Arc<dyn SkimItem>>>,
-) {
+) -> Result<(), crossbeam_channel::SendError<Vec<Arc<dyn SkimItem>>>> {
     if !new.starts_with(line_ending as char) {
         old.push_str(new);
         let items = vec![into_skim_item(old, opts)];
-        send(items, tx_item);
+        send(items, tx_item)?;
         old.clear();
-        return;
+        return Ok(());
     }
 
     let items = [&old, new].iter().map(|line| into_skim_item(line, opts)).collect();
 
-    send(items, tx_item);
+    send(items, tx_item)?;
 
     old.clear();
-}
 
-static EMPTY_STRING: &str = "";
-static ARC_EMPTY_STRING: LazyLock<Arc<Box<str>>> = LazyLock::new(|| Arc::new(EMPTY_STRING.into()));
+    Ok(())
+}
 
 fn into_skim_item(line: &str, opts: &SendRawOrBuild) -> Arc<dyn SkimItem> {
     match opts {
@@ -166,7 +163,6 @@ fn into_skim_item(line: &str, opts: &SendRawOrBuild) -> Arc<dyn SkimItem> {
             );
             Arc::new(item)
         }
-        SendRawOrBuild::Raw if line.is_empty() => ARC_EMPTY_STRING.clone(),
         SendRawOrBuild::Raw => {
             let item: Box<str> = line.into();
             Arc::new(item)
@@ -174,6 +170,9 @@ fn into_skim_item(line: &str, opts: &SendRawOrBuild) -> Arc<dyn SkimItem> {
     }
 }
 
-fn send(vec: Vec<Arc<dyn SkimItem>>, tx_item: &Sender<Vec<Arc<dyn SkimItem>>>) {
-    let _ = tx_item.send(vec);
+fn send(
+    vec: Vec<Arc<dyn SkimItem>>,
+    tx_item: &Sender<Vec<Arc<dyn SkimItem>>>,
+) -> Result<(), crossbeam_channel::SendError<Vec<Arc<dyn SkimItem>>>> {
+    tx_item.send(vec)
 }
