@@ -75,7 +75,7 @@ pub struct Model {
     matcher_timer: Instant,
     reader_control: Option<ReaderControl>,
     matcher_control: Option<MatcherControl>,
-    thread_pool: Option<Arc<ThreadPool>>,
+    thread_pool: Arc<ThreadPool>,
 
     header: Header,
 
@@ -186,7 +186,7 @@ impl Model {
             .expect("option margin is should be specified (by default)");
         let (margin_top, margin_right, margin_bottom, margin_left) = margins;
 
-        let opt_thread_pool = Self::generate_thread_pool();
+        let thread_pool = Self::generate_thread_pool();
 
         let mut ret = Model {
             reader,
@@ -209,7 +209,7 @@ impl Model {
             matcher_timer: Instant::now(),
             reader_control: None,
             matcher_control: None,
-            thread_pool: opt_thread_pool,
+            thread_pool,
 
             header,
             preview_hidden: true,
@@ -233,8 +233,12 @@ impl Model {
         ret
     }
 
-    fn generate_thread_pool() -> Option<Arc<ThreadPool>> {
-        rayon::ThreadPoolBuilder::new().build().ok().map(|pool| Arc::new(pool))
+    fn generate_thread_pool() -> Arc<ThreadPool> {
+        rayon::ThreadPoolBuilder::new()
+            .build()
+            .ok()
+            .map(|pool| Arc::new(pool))
+            .expect("Could not generate matcher thread pool")
     }
 
     fn parse_options(&mut self, options: &SkimOptions) {
@@ -823,9 +827,7 @@ impl Model {
             Arc::downgrade(&self.item_pool),
             self.tx.clone(),
             cleared_vec,
-            self.thread_pool
-                .as_ref()
-                .expect("Could not obtain a reference to a thread pool."),
+            Arc::downgrade(&self.thread_pool),
         );
 
         // replace None matcher

@@ -8,6 +8,7 @@ use tuikit::key::Key;
 
 use crate::event::Event;
 use crate::item::{ItemPool, MatchedItem};
+
 use crate::spinlock::SpinLock;
 use crate::{CaseMatching, MatchEngine, MatchEngineFactory, SkimItem};
 use crate::{MatchRange, Rank};
@@ -28,7 +29,9 @@ impl Drop for MatcherControl {
     fn drop(&mut self) {
         self.kill();
 
-        let _items = self.take();
+        let items = self.take();
+
+        rayon::spawn(|| drop(items));
     }
 }
 
@@ -97,7 +100,7 @@ impl Matcher {
         item_pool_weak: Weak<ItemPool>,
         tx_heartbeat: Sender<(Key, Event)>,
         matched_items: Vec<MatchedItem>,
-        thread_pool: &Arc<ThreadPool>,
+        thread_pool_weak: Weak<ThreadPool>,
     ) -> MatcherControl {
         let matcher_engine = self.engine_factory.create_engine_with_case(query, self.case_matching);
         debug!("engine: {}", matcher_engine);
@@ -113,63 +116,65 @@ impl Matcher {
         // shortcut for when there is no query or query is disabled
         let matcher_disabled: bool = disabled || query.is_empty();
 
-        thread_pool.install(|| {
-            rayon::spawn(move || {
-                if let Some(item_pool_strong) = Weak::upgrade(&item_pool_weak) {
-                    let num_taken = item_pool_strong.num_taken();
-                    let items = item_pool_strong.take();
-                    let stopped_ref = stopped.as_ref();
-                    let processed_ref = processed.as_ref();
-                    let matched_ref = matched.as_ref();
+        if let Some(pool) = Weak::upgrade(&thread_pool_weak) {
+            pool.install(|| {
+                rayon::spawn(move || {
+                    if let Some(item_pool_strong) = Weak::upgrade(&item_pool_weak) {
+                        let num_taken = item_pool_strong.num_taken();
+                        let items = item_pool_strong.take();
+                        let stopped_ref = stopped.as_ref();
+                        let processed_ref = processed.as_ref();
+                        let matched_ref = matched.as_ref();
 
-                    trace!("matcher start, total: {}", items.len());
+                        trace!("matcher start, total: {}", items.len());
 
-                    let par_iter = items
-                        .par_iter()
-                        .enumerate()
-                        .chunks(16384)
-                        .take_any_while(|vec| {
-                            if stopped_ref.load(Ordering::Relaxed) {
-                                return false;
-                            }
-
-                            processed_ref.fetch_add(vec.len(), Ordering::Relaxed);
-                            true
-                        })
-                        .map(|chunk| {
-                            chunk.into_iter().filter_map(|(index, item)| {
-                                // dummy values should not change, as changing them
-                                // may cause the disabled/query empty case disappear!
-                                // especially item index.  Needs an index to appear!
-                                if matcher_disabled {
-                                    return Some(MatchedItem {
-                                        item: Arc::downgrade(item),
-                                        rank: UNMATCHED_RANK,
-                                        matched_range: UNMATCHED_RANGE,
-                                        item_idx: (num_taken + index) as u32,
-                                    });
+                        let par_iter = items
+                            .par_iter()
+                            .enumerate()
+                            .chunks(16384)
+                            .take_any_while(|vec| {
+                                if stopped_ref.load(Ordering::Relaxed) {
+                                    return false;
                                 }
 
-                                Self::process_item(index, num_taken, matched_ref, matcher_engine.as_ref(), item)
+                                processed_ref.fetch_add(vec.len(), Ordering::Relaxed);
+                                true
                             })
-                        })
-                        .flatten_iter();
+                            .map(|chunk| {
+                                chunk.into_iter().filter_map(|(index, item)| {
+                                    // dummy values should not change, as changing them
+                                    // may cause the disabled/query empty case disappear!
+                                    // especially item index.  Needs an index to appear!
+                                    if matcher_disabled {
+                                        return Some(MatchedItem {
+                                            item: Arc::downgrade(item),
+                                            rank: UNMATCHED_RANK,
+                                            matched_range: UNMATCHED_RANGE,
+                                            item_idx: (num_taken + index) as u32,
+                                        });
+                                    }
 
-                    if let Some(matched_items_strong) = Weak::upgrade(&matched_items_weak) {
-                        if !stopped_ref.load(Ordering::SeqCst) {
-                            let mut pool = matched_items_strong.lock();
-                            pool.clear();
-                            pool.par_extend(par_iter);
-                            trace!("matcher stop, total matched: {}", pool.len());
+                                    Self::process_item(index, num_taken, matched_ref, matcher_engine.as_ref(), item)
+                                })
+                            })
+                            .flatten_iter();
+
+                        if let Some(matched_items_strong) = Weak::upgrade(&matched_items_weak) {
+                            if !stopped_ref.load(Ordering::SeqCst) {
+                                let mut pool = matched_items_strong.lock();
+                                pool.clear();
+                                pool.par_extend(par_iter);
+                                trace!("matcher stop, total matched: {}", pool.len());
+                            }
                         }
                     }
-                }
 
-                stopped.store(true, Ordering::SeqCst);
+                    stopped.store(true, Ordering::SeqCst);
 
-                let _ = tx_heartbeat.send((Key::Null, Event::EvHeartBeat));
+                    let _ = tx_heartbeat.send((Key::Null, Event::EvHeartBeat));
+                });
             });
-        });
+        }
 
         MatcherControl {
             stopped: stopped_clone,
