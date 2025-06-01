@@ -1,8 +1,8 @@
 use std::cmp::max;
 use std::cmp::min;
 use std::collections::BTreeMap;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use tuikit::prelude::{Event as TermEvent, *};
 
@@ -13,7 +13,7 @@ use crate::item::MatchedItem;
 use crate::orderedvec::OrderedVec;
 use crate::theme::{ColorTheme, DEFAULT_THEME};
 use crate::util::clear_canvas;
-use crate::util::{print_item, reshape_string, LinePrinter};
+use crate::util::{LinePrinter, print_item, reshape_string};
 use crate::{DisplayContext, MatchRange, Matches, Selector, SkimItem, SkimOptions};
 use regex::Regex;
 use unicode_width::UnicodeWidthStr;
@@ -463,7 +463,7 @@ impl Selection {
         let container_width = screen_width - 2;
 
         let opt_matches = match &matched_item.matched_range {
-            Some(MatchRange::Chars(ref matched_indices)) => Some(Matches::CharIndices(matched_indices)),
+            Some(MatchRange::Chars(matched_indices)) => Some(Matches::CharIndices(matched_indices)),
             Some(MatchRange::ByteRange(start, end)) => Some(Matches::ByteRange(*start, *end)),
             _ => None,
         };
