@@ -1,6 +1,6 @@
 [package]
 name = "two_percent"
-version = "0.12.14"
+version = "0.12.15"
 authors = [
     "Zhang Jinzhou <lotabout@gmail.com>",
     "Robert Swinford <robert.swinford <...at...> gmail.com>",
@@ -48,7 +48,7 @@ bitflags = { version = "2.9.1", default-features = false }
 crossbeam-channel = { version = "0.5.15", default-features = false, features = [
     "std",
 ] }
-which = { version = "7.0.3", default-features = false }
+which = { version = "8.0.0", default-features = false, features = ["real-sys"] }
 libc = { version = "0.2.172", default-features = false }
 
 [features]
