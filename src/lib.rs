@@ -335,7 +335,7 @@ impl Skim {
                     }
 
                     let (key, action_chain) = input.translate_event(key);
-                    for event in action_chain.into_iter() {
+                    for event in action_chain {
                         let _ = tx_clone.send((key, event));
                     }
                 }
