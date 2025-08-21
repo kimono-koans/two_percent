@@ -1,5 +1,5 @@
 use crate::ansi::ANSIParser;
-use crate::field::{parse_matching_fields, parse_transform_fields, FieldRange};
+use crate::field::{FieldRange, parse_matching_fields, parse_transform_fields};
 use crate::{AnsiString, DisplayContext, Matches, SkimItem};
 use regex::Regex;
 use std::borrow::Cow;
@@ -85,11 +85,11 @@ impl DefaultSkimItem {
 
 impl SkimItem for DefaultSkimItem {
     #[inline]
-    fn text(&self) -> Cow<str> {
+    fn text(&self) -> Cow<'_, str> {
         Cow::Borrowed(self.text.stripped())
     }
 
-    fn output(&self) -> Cow<str> {
+    fn output(&self) -> Cow<'_, str> {
         match &self.orig_text {
             Some(orig_text) if self.text.has_attrs() => {
                 let mut ansi_parser: ANSIParser = Default::default();
