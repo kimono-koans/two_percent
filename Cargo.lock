@@ -643,7 +643,7 @@ dependencies = [
 
 [[package]]
 name = "two_percent"
-version = "0.12.15"
+version = "0.12.16"
 dependencies = [
  "bitflags 2.9.2",
  "clap",
