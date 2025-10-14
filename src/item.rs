@@ -106,13 +106,32 @@ use crate::reader::ITEMS_INITIAL_CAPACITY;
 
 pub struct ItemPool {
     length: AtomicUsize,
-    pool: SpinLock<Vec<Arc<dyn SkimItem>>>,
+    pool: SpinLock<Vec<IndexedStrongItem>>,
     /// number of items that was `take`n
     taken: AtomicUsize,
 
     /// reverse first N lines as header
     reserved_items: SpinLock<Vec<Weak<dyn SkimItem>>>,
     lines_to_reserve: usize,
+}
+
+pub struct IndexedStrongItem {
+    idx: usize,
+    inner: Arc<dyn SkimItem>,
+}
+
+impl IndexedStrongItem {
+    pub fn new(idx: usize, item: Arc<dyn SkimItem>) -> Self {
+        Self { idx, inner: item }
+    }
+
+    pub fn idx(&self) -> usize {
+        self.idx
+    }
+
+    pub fn inner(&self) -> &Arc<dyn SkimItem> {
+        &self.inner
+    }
 }
 
 impl Drop for ItemPool {
@@ -179,14 +198,26 @@ impl ItemPool {
         let mut header_items = self.reserved_items.lock();
 
         let to_reserve = self.lines_to_reserve - header_items.len();
+        let pool_len = pool.len();
+
         if to_reserve > 0 {
             let to_reserve = min(to_reserve, items.len());
-            let mut reserved_pool = items[..to_reserve].to_vec();
-            pool.append(&mut reserved_pool);
+            let reserved_pool = &items[..to_reserve];
+            pool.extend(
+                reserved_pool
+                    .iter()
+                    .enumerate()
+                    .map(|(idx, item)| IndexedStrongItem::new(idx + pool_len, item.to_owned())),
+            );
             let mut reserved_header: Vec<Weak<dyn SkimItem>> = reserved_pool.iter().map(Arc::downgrade).collect();
             header_items.append(&mut reserved_header);
         } else {
-            pool.append(items);
+            pool.extend(
+                items
+                    .into_iter()
+                    .enumerate()
+                    .map(|(idx, item)| IndexedStrongItem::new(idx + pool_len, item.to_owned())),
+            );
         }
 
         self.length.store(pool.len(), Ordering::SeqCst);
@@ -194,7 +225,7 @@ impl ItemPool {
         pool.len()
     }
 
-    pub fn take(&self) -> ItemPoolGuard<'_, Arc<dyn SkimItem>> {
+    pub fn take(&self) -> ItemPoolGuard<'_, IndexedStrongItem> {
         let guard = self.pool.lock();
         let taken = self.taken.swap(guard.len(), Ordering::SeqCst);
         ItemPoolGuard { guard, start: taken }

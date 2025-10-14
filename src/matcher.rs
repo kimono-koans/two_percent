@@ -2,8 +2,8 @@ use crossbeam_channel::Sender;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Weak};
 
-use rayon::prelude::*;
 use rayon::ThreadPool;
+use rayon::prelude::*;
 use tuikit::key::Key;
 
 use crate::event::Event;
@@ -129,32 +129,36 @@ impl Matcher {
                         trace!("matcher start, total: {}", items.len());
 
                         let par_iter = items
-                            .par_iter()
-                            .enumerate()
-                            .chunks(16384)
-                            .take_any_while(|vec| {
+                            .par_chunks(16384)
+                            .take_any_while(|chunk| {
                                 if stopped_ref.load(Ordering::Relaxed) {
                                     return false;
                                 }
 
-                                processed_ref.fetch_add(vec.len(), Ordering::Relaxed);
+                                processed_ref.fetch_add(chunk.len(), Ordering::Relaxed);
                                 true
                             })
                             .map(|chunk| {
-                                chunk.into_iter().filter_map(|(index, item)| {
+                                chunk.into_iter().filter_map(|item| {
                                     // dummy values should not change, as changing them
                                     // may cause the disabled/query empty case disappear!
                                     // especially item index.  Needs an index to appear!
                                     if matcher_disabled {
                                         return Some(MatchedItem {
-                                            item: Arc::downgrade(item),
+                                            item: Arc::downgrade(item.inner()),
                                             rank: UNMATCHED_RANK,
                                             matched_range: UNMATCHED_RANGE,
-                                            item_idx: (num_taken + index) as u32,
+                                            item_idx: (num_taken + item.idx()) as u32,
                                         });
                                     }
 
-                                    Self::process_item(index, num_taken, matched_ref, matcher_engine.as_ref(), item)
+                                    Self::process_item(
+                                        item.idx(),
+                                        num_taken,
+                                        matched_ref,
+                                        matcher_engine.as_ref(),
+                                        item.inner(),
+                                    )
                                 })
                             })
                             .flatten_iter();
