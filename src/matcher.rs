@@ -2,8 +2,8 @@ use crossbeam_channel::Sender;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Weak};
 
-use rayon::prelude::*;
 use rayon::ThreadPool;
+use rayon::prelude::*;
 use tuikit::key::Key;
 
 use crate::event::Event;
@@ -131,7 +131,7 @@ impl Matcher {
                         let par_iter = items
                             .par_iter()
                             .enumerate()
-                            .chunks(16384)
+                            .chunks(8192)
                             .take_any_while(|vec| {
                                 if stopped_ref.load(Ordering::Relaxed) {
                                     return false;
