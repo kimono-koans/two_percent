@@ -560,7 +560,6 @@ impl Model {
 
         loop {
             let (key, ev) = next_event.take().or_else(|| self.rx.recv().ok())?;
-            let (width, height) = self.term.term_size().unwrap();
 
             debug!("handle event: {:?}", ev);
 
@@ -745,7 +744,9 @@ impl Model {
 
             self.draw_preview(&env, false);
 
-            let _ = self.do_with_widget(|root| self.term.draw(&root));
+            let _ = self.do_with_widget(|root| {
+                let _ = self.term.draw(&root);
+            });
             let _ = self.term.present();
         }
     }
