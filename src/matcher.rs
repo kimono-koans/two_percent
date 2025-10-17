@@ -121,7 +121,7 @@ impl Matcher {
                 rayon::spawn(move || {
                     if let Some(item_pool_strong) = Weak::upgrade(&item_pool_weak) {
                         let num_taken = item_pool_strong.num_taken();
-                        let items = item_pool_strong.take();
+                        let items = &*item_pool_strong.take();
                         let stopped_ref = stopped.as_ref();
                         let processed_ref = processed.as_ref();
                         let matched_ref = matched.as_ref();
@@ -129,33 +129,46 @@ impl Matcher {
                         trace!("matcher start, total: {}", items.len());
 
                         let par_iter = items
-                            .par_iter()
+                            .par_chunks(8192)
                             .enumerate()
-                            .chunks(8192)
-                            .take_any_while(|vec| {
+                            .take_any_while(|(_master_idx, chunk)| {
                                 if stopped_ref.load(Ordering::Relaxed) {
                                     return false;
                                 }
 
-                                processed_ref.fetch_add(vec.len(), Ordering::Relaxed);
+                                processed_ref.fetch_add(chunk.len(), Ordering::Relaxed);
                                 true
                             })
-                            .map(|chunk| {
-                                chunk.into_iter().filter_map(|(index, item)| {
-                                    // dummy values should not change, as changing them
-                                    // may cause the disabled/query empty case disappear!
-                                    // especially item index.  Needs an index to appear!
-                                    if matcher_disabled {
-                                        return Some(MatchedItem {
-                                            item: Arc::downgrade(item),
-                                            rank: UNMATCHED_RANK,
-                                            matched_range: UNMATCHED_RANGE,
-                                            item_idx: (num_taken + index) as u32,
-                                        });
-                                    }
+                            .map(|(master_idx, chunk)| {
+                                chunk
+                                    .iter()
+                                    .enumerate()
+                                    .map(move |(idx, item)| {
+                                        let item_idx = ((master_idx - 1) * 8192) + idx;
 
-                                    Self::process_item(index, num_taken, matched_ref, matcher_engine.as_ref(), item)
-                                })
+                                        (item_idx, item)
+                                    })
+                                    .filter_map(|(item_idx, item)| {
+                                        // dummy values should not change, as changing them
+                                        // may cause the disabled/query empty case disappear!
+                                        // especially item index.  Needs an index to appear!
+                                        if matcher_disabled {
+                                            return Some(MatchedItem {
+                                                item: Arc::downgrade(item),
+                                                rank: UNMATCHED_RANK,
+                                                matched_range: UNMATCHED_RANGE,
+                                                item_idx: (num_taken + item_idx) as u32,
+                                            });
+                                        }
+
+                                        Self::process_item(
+                                            item_idx,
+                                            num_taken,
+                                            matched_ref,
+                                            matcher_engine.as_ref(),
+                                            item,
+                                        )
+                                    })
                             })
                             .flatten_iter();
 
