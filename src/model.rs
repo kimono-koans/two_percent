@@ -703,15 +703,11 @@ impl Model {
                 Event::EvActClearScreen => {
                     let _ = self.term.clear();
                     let _ = self.term.present();
-
-                    continue;
                 }
 
                 Event::EvActRedraw => {
                     let _ = UpdateScreen::REDRAW;
                     let _ = self.term.present();
-
-                    continue;
                 }
 
                 _ => {}
@@ -744,9 +740,10 @@ impl Model {
 
             self.draw_preview(&env, false);
 
-            let _ = self.do_with_widget(|root| {
-                let _ = self.term.draw(&root);
+            self.do_with_widget(|root| {
+                self.term.draw(&root).unwrap();
             });
+
             let _ = self.term.present();
         }
     }
