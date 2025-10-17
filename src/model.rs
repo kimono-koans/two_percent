@@ -13,11 +13,12 @@ use std::sync::LazyLock;
 use tuikit::prelude::{Event as TermEvent, *};
 
 use crate::engine::factory::{AndOrEngineFactory, ExactOrFuzzyEngineFactory, RegexEngineFactory};
+use crate::event::UpdateScreen;
 use crate::event::{Event, EventHandler, EventReceiver, EventSender};
 use crate::global::current_run_num;
 use crate::header::Header;
 use crate::input::parse_action_arg;
-use crate::item::{parse_criteria, ItemPool, MatchedItem, RankBuilder, RankCriteria};
+use crate::item::{ItemPool, MatchedItem, RankBuilder, RankCriteria, parse_criteria};
 use crate::matcher::{Matcher, MatcherControl};
 use crate::options::SkimOptions;
 use crate::output::SkimOutput;
@@ -28,7 +29,7 @@ use crate::selection::Selection;
 use crate::spinlock::SpinLock;
 use crate::theme::ColorTheme;
 use crate::util::clear_canvas;
-use crate::util::{depends_on_items, inject_command, margin_string_to_size, parse_margin, InjectContext};
+use crate::util::{InjectContext, depends_on_items, inject_command, margin_string_to_size, parse_margin};
 use crate::{MatchEngineFactory, MatchRange, SkimItem};
 use std::cmp::max;
 
@@ -556,8 +557,10 @@ impl Model {
 
         // In the event loop, there might need
         let mut next_event = Some((Key::Null, Event::EvHeartBeat));
+
         loop {
             let (key, ev) = next_event.take().or_else(|| self.rx.recv().ok())?;
+            let (width, height) = self.term.term_size().unwrap();
 
             debug!("handle event: {:?}", ev);
 
@@ -696,6 +699,20 @@ impl Model {
 
                 Event::EvActRefreshPreview => {
                     self.draw_preview(&env, true);
+                }
+
+                Event::EvActClearScreen => {
+                    let _ = self.term.clear();
+                    let _ = self.term.present();
+
+                    continue;
+                }
+
+                Event::EvActRedraw => {
+                    let _ = UpdateScreen::REDRAW;
+                    let _ = self.term.present();
+
+                    continue;
                 }
 
                 _ => {}
