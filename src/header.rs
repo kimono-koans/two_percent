@@ -5,7 +5,7 @@ use crate::event::{Event, EventHandler};
 use crate::item::ItemPool;
 use crate::theme::ColorTheme;
 use crate::theme::DEFAULT_THEME;
-use crate::util::{clear_canvas, print_item, str_lines, LinePrinter};
+use crate::util::{LinePrinter, clear_canvas, print_item, str_lines};
 use crate::{DisplayContext, SkimOptions};
 
 use std::cmp::max;
@@ -24,8 +24,11 @@ pub struct Header {
 
 impl Drop for Header {
     fn drop(&mut self) {
-        let _item_pool = std::mem::take(&mut self.item_pool);
-        let _header = std::mem::take(&mut self.header);
+        let item_pool = std::mem::take(&mut self.item_pool);
+        let header = std::mem::take(&mut self.header);
+
+        drop(item_pool);
+        drop(header);
     }
 }
 
@@ -84,11 +87,7 @@ impl Header {
     }
 
     fn adjust_row(&self, index: usize, screen_height: usize) -> usize {
-        if self.reverse {
-            index
-        } else {
-            screen_height - index - 1
-        }
+        if self.reverse { index } else { screen_height - index - 1 }
     }
 }
 

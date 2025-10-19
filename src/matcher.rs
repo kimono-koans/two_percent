@@ -31,7 +31,7 @@ impl Drop for MatcherControl {
 
         let items = self.take();
 
-        rayon::spawn(|| drop(items));
+        drop(items);
     }
 }
 

@@ -109,19 +109,12 @@ impl Drop for Model {
         let header = std::mem::take(&mut self.header);
         let item_pool = std::mem::take(&mut self.item_pool);
 
-        rayon::spawn(move || {
-            drop(m_ctrl);
-            drop(r_ctrl);
+        drop(m_ctrl);
+        drop(r_ctrl);
 
-            drop(header);
-            drop(selection);
-            drop(item_pool);
-
-            #[cfg(feature = "malloc_trim")]
-            #[cfg(target_os = "linux")]
-            #[cfg(target_env = "gnu")]
-            malloc_trim();
-        });
+        drop(header);
+        drop(selection);
+        drop(item_pool);
 
         #[cfg(feature = "malloc_trim")]
         #[cfg(target_os = "linux")]
