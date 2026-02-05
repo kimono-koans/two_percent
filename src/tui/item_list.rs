@@ -532,7 +532,7 @@ impl SkimWidget for ItemList {
         // Spawn background processing thread with the appropriate configuration
         let processed_items_clone = processed_items.clone();
         let no_sort = options.no_sort;
-        std::thread::spawn(move || {
+        rayon::spawn(move || {
             Self::process_items_task(rx, processed_items_clone, no_sort);
         });
 

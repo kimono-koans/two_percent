@@ -238,7 +238,7 @@ pub fn run_with(opts: &SkimOptions) -> Option<SkimOutput> {
 
         // Use a channel-based timeout since JoinHandle doesn't have join_timeout
         let (tx, rx) = mpsc::channel();
-        thread::spawn(move || {
+        rayon::spawn(move || {
             let _ = tx.send(handle.join());
         });
 

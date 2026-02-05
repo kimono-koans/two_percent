@@ -1,7 +1,7 @@
 //! This module contains the matching coordinator
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::thread;
+use std::thread::{self, JoinHandle};
 
 use rayon::prelude::*;
 
@@ -23,6 +23,7 @@ pub struct MatcherControl {
     processed: Arc<AtomicUsize>,
     matched: Arc<AtomicUsize>,
     items: Arc<SpinLock<Vec<MatchedItem>>>,
+    handle: Option<JoinHandle<()>>,
 }
 
 impl Default for MatcherControl {
@@ -32,6 +33,7 @@ impl Default for MatcherControl {
             processed: Default::default(),
             matched: Default::default(),
             items: Default::default(),
+            handle: None,
         }
     }
 }
@@ -50,6 +52,12 @@ impl MatcherControl {
     /// Signals the matcher to stop processing.
     pub fn kill(&mut self) {
         self.stopped.store(true, Ordering::Relaxed);
+
+        let handle = self.handle.take();
+
+        rayon::spawn(|| {
+            handle.map(|handle| handle.join());
+        });
     }
 
     /// Returns true if the matcher has stopped (either completed or killed).
@@ -66,7 +74,7 @@ impl MatcherControl {
 
 impl Drop for MatcherControl {
     fn drop(&mut self) {
-        self.stopped.store(true, Ordering::Relaxed);
+        self.kill();
     }
 }
 
@@ -171,7 +179,7 @@ impl Matcher {
         let matched_items = Arc::new(SpinLock::new(Vec::new()));
         let matched_items_clone = matched_items.clone();
 
-        thread::spawn(move || {
+        let matcher_handle = thread::spawn(move || {
             let _num_taken = item_pool.num_taken();
             let items = item_pool.take();
 
@@ -216,6 +224,7 @@ impl Matcher {
             matched: matched_clone,
             processed: processed_clone,
             items: matched_items_clone,
+            handle: Some(matcher_handle),
         }
     }
 }

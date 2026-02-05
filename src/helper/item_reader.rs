@@ -274,7 +274,7 @@ impl SkimItemReader {
         let (tx_item, rx_item): (SkimItemSender, SkimItemReceiver) = unbounded_channel();
         let option = self.option.clone();
 
-        thread::spawn(move || {
+        rayon::spawn(move || {
             Self::read_lines_into_items(source, tx_item, option, vec![], vec![]);
         });
 
@@ -302,7 +302,7 @@ impl SkimItemReader {
         let components_to_stop_clone = components_to_stop.clone();
         let tx_item_clone = tx_item.clone();
         // listening to close signal and kill command if needed
-        thread::spawn(move || {
+        rayon::spawn(move || {
             debug!("collector: command killer start");
             components_to_stop_clone.fetch_add(1, Ordering::SeqCst);
             started_clone.store(true, Ordering::SeqCst); // notify parent that it is started
@@ -355,7 +355,7 @@ impl SkimItemReader {
         let transform_fields = option.transform_fields.clone();
         let matching_fields = option.matching_fields.clone();
 
-        thread::spawn(move || {
+        rayon::spawn(move || {
             debug!("collector: command collector start");
             components_to_stop.fetch_add(1, Ordering::SeqCst);
             started_clone.store(true, Ordering::SeqCst); // notify parent that it is started
