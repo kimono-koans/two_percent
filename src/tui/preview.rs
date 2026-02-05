@@ -96,6 +96,7 @@ impl Preview {
         }
     }
 
+    #[allow(dead_code)]
     fn init_pty(&mut self) {
         let pty_system = native_pty_system();
         let pair = pty_system
