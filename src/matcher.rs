@@ -209,18 +209,21 @@ impl Matcher {
             // relative to the actual matching work.
             const CHUNK_SIZE: usize = 512;
 
-            let matched_items: Vec<MatchedItem> = items
-                .into_par_iter()
-                .with_min_len(CHUNK_SIZE)
+            let matched_items = items
+                .into_iter()
+                .enumerate()
+                .par_bridge()
                 .fold(
                     || (Vec::new(), 0usize, 0usize), // (local_matches, local_processed, local_matched)
-                    |(mut local_matches, mut local_processed, mut local_matched), item| {
+                    |(mut local_matches, mut local_processed, mut local_matched), (idx, item)| {
                         // Check interrupt once at the start of each chunk boundary.
                         // The fold processes items sequentially within each rayon work unit,
                         // so checking every CHUNK_SIZE items amortizes the atomic load.
                         if local_processed % CHUNK_SIZE == 0 && interrupt.load(Ordering::Relaxed) {
                             return (local_matches, local_processed, local_matched);
                         }
+
+                        assert_eq!(idx, item.get_index());
 
                         local_processed += 1;
 
@@ -231,6 +234,7 @@ impl Matcher {
                                 rank: match_result.rank,
                                 rank_builder: rank_builder.clone(),
                                 matched_range: Some(match_result.matched_range),
+                                idx,
                             });
                         }
 

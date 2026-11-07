@@ -308,6 +308,7 @@ pub fn run_with(opts: &SkimOptions) -> Option<SkimOutput> {
             },
             rank_builder: Arc::new(RankBuilder::default()),
             matched_range: None,
+            idx: 0usize,
         };
         output_lines.push(Arc::new(item));
     }

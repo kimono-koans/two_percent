@@ -116,6 +116,8 @@ pub struct MatchedItem {
     pub rank_builder: Arc<RankBuilder>,
     /// Range of characters that matched the pattern
     pub matched_range: Option<MatchRange>,
+
+    pub idx: usize,
 }
 
 impl std::fmt::Debug for MatchedItem {

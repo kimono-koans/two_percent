@@ -650,6 +650,7 @@ impl App {
                     rank: Default::default(),
                     rank_builder: self.matcher.rank_builder.clone(),
                     matched_range: None,
+                    idx: 0usize,
                 }]);
                 self.item_list.select_row(self.item_list.items.len() - 1);
                 self.restart_matcher_debounced();
