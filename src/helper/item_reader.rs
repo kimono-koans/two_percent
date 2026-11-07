@@ -204,7 +204,7 @@ impl SkimItemReader {
     ) {
         let mut buffer = Vec::with_capacity(option.buf_size);
         let mut line_idx = 0;
-        let mut items_to_send = Vec::with_capacity(ITEMS_BUFFER_SIZE);
+        let mut items_to_send = Vec::new();
         let mut last_send_time = Instant::now();
         let send_timeout = Duration::from_millis(SEND_TIMEOUT_MS);
 
@@ -237,6 +237,7 @@ impl SkimItemReader {
                         &option.delimiter,
                         line_idx,
                     );
+
                     items_to_send.push(Arc::new(raw_item) as Arc<dyn SkimItem>);
 
                     line_idx += 1;
@@ -247,11 +248,11 @@ impl SkimItemReader {
             }
 
             // Send batched items if buffer is full OR timeout has elapsed
-            let should_send = items_to_send.len() == ITEMS_BUFFER_SIZE
+            let should_send = items_to_send.len() >= ITEMS_BUFFER_SIZE
                 || (!items_to_send.is_empty() && last_send_time.elapsed() >= send_timeout);
 
             if should_send {
-                let batch = std::mem::replace(&mut items_to_send, Vec::with_capacity(ITEMS_BUFFER_SIZE));
+                let batch = std::mem::take(&mut items_to_send);
                 match tx_item.send(batch) {
                     Ok(_) => {
                         last_send_time = Instant::now();

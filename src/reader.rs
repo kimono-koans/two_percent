@@ -52,8 +52,7 @@ impl ReaderControl {
     pub fn take(&self) -> Vec<Arc<dyn SkimItem>> {
         match self.items.try_lock() {
             Ok(mut items) => {
-                let mut ret = Vec::with_capacity(items.len());
-                ret.append(&mut items);
+                let ret = std::mem::take(&mut *items);
                 ret
             }
             Err(err) => match err {
