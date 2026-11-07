@@ -15,7 +15,7 @@ pub use crate::output::SkimOutput;
 pub use crate::reader::CommandCollector;
 pub use crate::tui::{Event, PreviewCallback, event::Action};
 pub use crate::*;
-pub use kanal::{Receiver, Sender, bounded, unbounded};
+pub use crossbeam::channel::{Receiver, Sender, bounded, unbounded};
 pub use std::borrow::Cow;
 pub use std::cell::RefCell;
 pub use std::rc::Rc;

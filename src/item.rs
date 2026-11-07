@@ -414,10 +414,10 @@ impl ItemPool {
 
     /// Takes items from the pool, copying new items since last take and releasing lock immediately
     pub fn take(&self) -> Vec<Arc<dyn SkimItem>> {
-        let guard = self.pool.lock();
-        let taken = self.taken.swap(guard.len(), Ordering::SeqCst);
+        let mut guard = self.pool.lock();
+        let _taken = self.taken.swap(guard.len(), Ordering::SeqCst);
         // Copy the new items out so we can release the lock immediately
-        let items = guard[taken..].to_vec();
+        let items = std::mem::take(&mut *guard);
         drop(guard); // Explicitly release lock
         items
     }

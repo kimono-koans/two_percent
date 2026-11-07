@@ -223,7 +223,7 @@ impl Matcher {
                             return (local_matches, local_processed, local_matched);
                         }
 
-                        //assert_eq!(idx, item.get_index());
+                        assert_eq!(idx, item.get_index());
 
                         local_processed += 1;
 

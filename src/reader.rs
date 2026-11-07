@@ -1,6 +1,8 @@
 //! Reader is used for reading items from datasource (e.g. stdin or command output)
 //!
 //! After reading in a line, reader will save an item into the pool(items)
+use crossbeam::channel::{Receiver, TryRecvError};
+
 use crate::item::ItemPool;
 use crate::options::SkimOptions;
 use crate::prelude::{Sender, SkimItemReader};
@@ -163,7 +165,7 @@ fn collect_items<F>(components_to_stop: Arc<AtomicUsize>, rx_item: SkimItemRecei
 where
     F: Fn(Vec<Arc<dyn SkimItem>>) + Send + 'static,
 {
-    let (tx_interrupt, rx_interrupt) = crate::prelude::bounded(8);
+    let (tx_interrupt, rx_interrupt): (Sender<i32>, Receiver<i32>) = crossbeam::channel::bounded(8);
 
     let started = Arc::new(AtomicBool::new(false));
     let started_clone = started.clone();
@@ -175,22 +177,25 @@ where
         let mut backoff = 0;
 
         loop {
-            if let Ok(Some(msg)) = rx_interrupt.try_recv() {
+            if let Ok(msg) = rx_interrupt.try_recv() {
                 debug!("interrupt: {msg}");
                 break;
             }
+
             match rx_item.try_recv() {
-                Ok(Some(items)) => {
+                Ok(items) => {
                     trace!("collect_item: got {} items", items.len());
                     callback(items);
                 }
-                Ok(None) => {
-                    std::thread::sleep(std::time::Duration::from_millis(backoff));
-                    backoff += 10;
-                }
-                Err(_) => {
-                    break;
-                }
+
+                Err(err) => match err {
+                    TryRecvError::Disconnected => break,
+                    TryRecvError::Empty => {
+                        std::thread::sleep(std::time::Duration::from_millis(backoff));
+                        backoff += 10;
+                        continue;
+                    }
+                },
             }
         }
 

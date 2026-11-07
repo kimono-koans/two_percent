@@ -8,6 +8,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::thread;
 use std::time::{Duration, Instant};
 
+use crossbeam::channel::{SendError, TrySendError};
 use regex::Regex;
 
 use crate::field::FieldRange;
@@ -273,7 +274,7 @@ impl SkimItemReader {
 
     /// helper: convert bufread into SkimItemReceiver
     fn raw_bufread(&self, source: impl BufRead + Send + 'static) -> SkimItemReceiver {
-        let (tx_item, rx_item): (SkimItemSender, SkimItemReceiver) = kanal::bounded(1024 * 1024);
+        let (tx_item, rx_item): (SkimItemSender, SkimItemReceiver) = crossbeam::channel::bounded(1024 * 1024);
         let option = self.option.clone();
 
         thread::spawn(move || {

@@ -362,6 +362,6 @@ pub trait Selector {
 
 //------------------------------------------------------------------------------
 /// Sender for streaming items to skim
-pub type SkimItemSender = kanal::Sender<Vec<Arc<dyn SkimItem>>>;
+pub type SkimItemSender = crossbeam::channel::Sender<Vec<Arc<dyn SkimItem>>>;
 /// Receiver for streaming items to skim
-pub type SkimItemReceiver = kanal::Receiver<Vec<Arc<dyn SkimItem>>>;
+pub type SkimItemReceiver = crossbeam::channel::Receiver<Vec<Arc<dyn SkimItem>>>;
