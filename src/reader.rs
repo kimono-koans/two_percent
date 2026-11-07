@@ -4,12 +4,12 @@
 use crate::item::ItemPool;
 use crate::options::SkimOptions;
 use crate::prelude::{Sender, SkimItemReader};
-use crate::spinlock::SpinLock;
 use crate::{SkimItem, SkimItemReceiver};
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::sync::Arc;
+use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::{Arc, TryLockError};
 
 /// Trait for collecting items from command output
 pub trait CommandCollector {
@@ -32,7 +32,7 @@ pub struct ReaderControl {
     tx_interrupt: Sender<i32>,
     tx_interrupt_cmd: Option<Sender<i32>>,
     components_to_stop: Arc<AtomicUsize>,
-    items: Arc<SpinLock<Vec<Arc<dyn SkimItem>>>>,
+    items: Arc<Mutex<Vec<Arc<dyn SkimItem>>>>,
 }
 
 impl ReaderControl {
@@ -50,16 +50,28 @@ impl ReaderControl {
 
     /// Takes all items collected so far
     pub fn take(&self) -> Vec<Arc<dyn SkimItem>> {
-        let mut items = self.items.lock();
-        let mut ret = Vec::with_capacity(items.len());
-        ret.append(&mut items);
-        ret
+        match self.items.try_lock() {
+            Ok(mut items) => {
+                let mut ret = Vec::with_capacity(items.len());
+                ret.append(&mut items);
+                ret
+            }
+            Err(err) => match err {
+                TryLockError::Poisoned(_) => unreachable!(),
+                TryLockError::WouldBlock => Vec::new(),
+            },
+        }
     }
 
     /// Returns true if the reader has finished and no items remain
     pub fn is_done(&self) -> bool {
-        let items = self.items.lock();
-        self.components_to_stop.load(Ordering::SeqCst) == 0 && items.is_empty()
+        match self.items.try_lock() {
+            Ok(items) => self.components_to_stop.load(Ordering::SeqCst) == 0 && items.is_empty(),
+            Err(err) => match err {
+                TryLockError::Poisoned(_) => unreachable!(),
+                TryLockError::WouldBlock => false,
+            },
+        }
     }
 }
 
@@ -93,7 +105,7 @@ impl Reader {
     /// Starts the reader and returns a control handle
     pub fn run(&mut self, app_tx: Sender<Vec<Arc<dyn SkimItem>>>, cmd: &str) -> ReaderControl {
         let components_to_stop: Arc<AtomicUsize> = Arc::new(AtomicUsize::new(0));
-        let items = Arc::new(SpinLock::new(Vec::new()));
+        let items = Arc::new(Mutex::new(Vec::new()));
 
         let (rx_item, tx_interrupt_cmd) = self.rx_item.take().map(|rx| (rx, None)).unwrap_or_else(|| {
             let components_to_stop_clone = components_to_stop.clone();
@@ -116,7 +128,7 @@ impl Reader {
     /// Returns a control handle
     pub fn collect(&mut self, item_pool: Arc<ItemPool>, cmd: &str) -> ReaderControl {
         let components_to_stop: Arc<AtomicUsize> = Arc::new(AtomicUsize::new(0));
-        let items = Arc::new(SpinLock::new(Vec::new()));
+        let items = Arc::new(Mutex::new(Vec::new()));
 
         let (rx_item, tx_interrupt_cmd) = self.rx_item.take().map(|rx| (rx, None)).unwrap_or_else(|| {
             let components_to_stop_clone = components_to_stop.clone();
@@ -161,6 +173,8 @@ where
         components_to_stop.fetch_add(1, Ordering::SeqCst);
         started_clone.store(true, Ordering::SeqCst); // notify parent that it is started
 
+        let mut backoff = 0;
+
         loop {
             if let Ok(Some(msg)) = rx_interrupt.try_recv() {
                 debug!("interrupt: {msg}");
@@ -172,7 +186,8 @@ where
                     callback(items);
                 }
                 Ok(None) => {
-                    std::thread::sleep(std::time::Duration::from_millis(10));
+                    std::thread::sleep(std::time::Duration::from_millis(backoff));
+                    backoff += 10;
                 }
                 Err(_) => {
                     break;
